@@ -1,3 +1,3 @@
 news-please
 python-dateutil
-s3
+boto3

@@ -2,22 +2,25 @@ FROM python:3.6
 
 WORKDIR /tmp/
 
-COPY extractor.py .
 COPY requirements.txt .
 
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
-ENV WARC_DIRECTORY /tmp/warcs/
-ENV ARTICLE_DIRECTORY /tmp/articles/
+COPY extractor.py .
 
-ENV VALID_HOST https://bbc.co.uk/*
+ENV WARC_DIRECTORY      '/tmp/warcs/'
+ENV ARTICLE_DIRECTORY   '/tmp/articles/'
 
-ENV CRAWL_START_DATE 2022-02-13
-ENV CRAWL_END_DATE 2022-02-14
+ENV VALID_HOSTS         '["bbc.co.uk"]'
 
-ENV S3_BUCKET_ADDRESS http://imperialccnews.s3-website.eu-west-2.amazonaws.com
-ENV S3_PRIVATE_KEY not_for_public_consumption
+ENV CRAWL_START_DATE    '2022-02-13'
+ENV CRAWL_END_DATE      '2022-02-14'
+
+ENV S3_BUCKET_ADDRESS   'bucket_name'
+ENV AWS_ACCESS_KEY      'access_key'
+
+ENV ENVIRONMENT_TYPE    'dev'
 
 EXPOSE 8080
 EXPOSE 443
