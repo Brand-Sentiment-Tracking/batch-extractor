@@ -41,7 +41,7 @@ ENV VALID_HOSTS         '["bbc.co.uk"]'
 ENV CRAWL_START_DATE    '2022-02-13'
 ENV CRAWL_END_DATE      '2022-02-14'
 
-ENV S3_BUCKET_ADDRESS   'bucket_name'
+ENV S3_BUCKET_NAME   'bucket_name'
 ENV AWS_ACCESS_KEY      'access_key'
 
 ENV ENVIRONMENT_TYPE    'dev'

@@ -19,8 +19,8 @@ VALID_HOSTS = json.loads(os.environ.get("VALID_HOSTS"))
 CRAWL_START_DATE = os.environ.get("CRAWL_START_DATE")
 CRAWL_END_DATE = os.environ.get("CRAWL_END_DATE")
 
-S3_BUCKET_ADDRESS = os.environ.get("S3_BUCKET_ADDRESS")
-S3_PRIVATE_KEY = os.environ.get("S3_PRIVATE_KEY")
+S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
+AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY")
 
 s3_client = boto3.client("s3")
 
@@ -28,7 +28,7 @@ def upload_to_bucket(article_filepath):
     article_filename = os.path.basename(article_filepath)
 
     try:
-        s3_client.upload_file(article_filepath, S3_BUCKET_ADDRESS, article_filename)
+        s3_client.upload_file(article_filepath, S3_BUCKET_NAME, article_filename)
     except ClientError as e:
         logging.error(e)
 
