@@ -16,8 +16,8 @@ ENV VALID_HOST https://bbc.co.uk/*
 ENV CRAWL_START_DATE 2022-02-13
 ENV CRAWL_END_DATE 2022-02-14
 
-ENV S3_BUCKET_ADDRESS something
-ENV S3_PRIVATE_KEY matt_tell_me_the_api_key_pls
+ENV S3_BUCKET_ADDRESS http://imperialccnews.s3-website.eu-west-2.amazonaws.com
+ENV S3_PRIVATE_KEY LIcb9D43wJSO7AeAbRZTVOvRTzhTYKcbGqo9zxPE
 
 EXPOSE 8080
 EXPOSE 443
