@@ -21,11 +21,9 @@ AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY")
 
 s3_client = boto3.client("s3")
 
-def upload_to_bucket(article_filepath):
-    article_filename = os.path.basename(article_filepath)
-
+def upload_to_bucket(filepath, name):
     try:
-        s3_client.upload_file(article_filepath, S3_BUCKET_NAME, article_filename)
+        s3_client.upload_file(filepath, S3_BUCKET_NAME, name)
     except ClientError as e:
         logging.error(e)
 
@@ -33,11 +31,14 @@ def article_callback(article):
     article_name = re.sub(r"[^\w\.]+", "_", article.url)
     article_filepath = os.path.join(ARTICLE_DIRECTORY, f"{article_name}.json")
     
-    with open(article_filepath, 'w') as article_fp:
-        json.dump(article.__dict__, article_fp, default=str,
-                  sort_keys=True, indent=4, ensure_ascii=False)
-    
-    upload_to_bucket(article, article_name)
+    try:
+        with open(article_filepath, 'w') as article_fp:
+            json.dump(article.__dict__, article_fp, default=str,
+                    sort_keys=True, indent=4, ensure_ascii=False)
+    except UnicodeEncodeError:
+        logging.error(f"Failed to save {article_name} due to ascii encoding error.")
+
+    #upload_to_bucket(article_filepath, article_name)
 
 def warc_callback(*args):
     pass
