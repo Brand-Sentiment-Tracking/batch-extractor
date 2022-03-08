@@ -33,15 +33,16 @@ RUN pip3.6 install -r requirements.txt
 
 COPY extractor.py .
 
-ENV WARC_DIRECTORY      '/tmp/warcs/'
-ENV ARTICLE_DIRECTORY   '/tmp/articles/'
+ENV WARC_DIRECTORY          '/tmp/warcs/'
+ENV ARTICLE_DIRECTORY       '/tmp/articles/'
 
-ENV VALID_HOSTS         '["bbc.co.uk"]'
+ENV VALID_HOSTS             '["bbc.co.uk"]'
 
-ENV S3_BUCKET_NAME      'bucket_name'
-ENV AWS_ACCESS_KEY      'access_key'
+ENV S3_BUCKET_NAME          'bucket-name'
+ENV AWS_ACCESS_KEY_ID       'access-id'
+ENV AWS_SECRET_ACCESS_KEY   'secret-key'
 
-ENV ENVIRONMENT_TYPE    'dev'
+ENV ENVIRONMENT_TYPE        'dev'
 
 EXPOSE 8080
 EXPOSE 443

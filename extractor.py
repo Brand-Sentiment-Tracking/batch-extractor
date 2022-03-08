@@ -7,38 +7,44 @@ import re
 from datetime import datetime, date, timedelta
 from newsplease.crawler import commoncrawl_crawler as cc
 
+from datetime import date
 from botocore.exceptions import ClientError
 
 ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
 
 WARC_DIRECTORY = os.environ.get("WARC_DIRECTORY")
 ARTICLE_DIRECTORY = os.environ.get("ARTICLE_DIRECTORY")
-
 VALID_HOSTS = json.loads(os.environ.get("VALID_HOSTS"))
 
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
-AWS_ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY")
 
-s3_client = boto3.client("s3")
+s3 = boto3.client("s3")
 
-def upload_to_bucket(filepath, name):
+def upload_to_bucket(filepath, filename):    
     try:
-        s3_client.upload_file(filepath, S3_BUCKET_NAME, name)
+        s3.upload_file(filepath, S3_BUCKET_NAME, filename)
     except ClientError as e:
         logging.error(e)
 
 def article_callback(article):
-    article_name = re.sub(r"[^\w\.]+", "_", article.url)
-    article_filepath = os.path.join(ARTICLE_DIRECTORY, f"{article_name}.json")
+    name = re.sub(r"[^\w\.]+", "_", article.url)
+    subdirectory = date.today().isoformat()
+
+    s3_filename = os.path.join(subdirectory, f"{name}.json")
+    subdirectory_path = os.path.join(ARTICLE_DIRECTORY, subdirectory)
+    filepath = os.path.join(ARTICLE_DIRECTORY, s3_filename)
     
+    if not os.path.exists(subdirectory_path):
+        os.makedirs(subdirectory_path)
+
     try:
-        with open(article_filepath, 'w') as article_fp:
+        with open(filepath, 'w') as article_fp:
             json.dump(article.__dict__, article_fp, default=str,
                     sort_keys=True, indent=4, ensure_ascii=False)
     except UnicodeEncodeError:
-        logging.error(f"Failed to save {article_name} due to ascii encoding error.")
+        logging.error(f"Failed to save {name} due to ascii encoding error.")
 
-    #upload_to_bucket(article_filepath, article_name)
+    upload_to_bucket(filepath, s3_filename)
 
 def warc_callback(*args):
     pass
