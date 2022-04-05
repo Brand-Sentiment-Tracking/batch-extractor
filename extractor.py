@@ -6,8 +6,6 @@ import re
 
 from datetime import datetime, date, timedelta
 from newsplease.crawler import commoncrawl_crawler as cc
-
-from datetime import date
 from botocore.exceptions import ClientError
 
 ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
@@ -64,7 +62,7 @@ if __name__ == "__main__":
     start_date = end_date - timedelta(days=1)
 
     logging.info(f"Downloading articles crawled between "
-                 f"{start_date} and {end_date}.")
+                    f"{start_date} and {end_date}.")
 
     #logging.info(f"Extracting from: \n{'\n\t'.join(VALID_HOSTS)}")
     logging.info(f"Continuing after error? {continue_after_error}")
