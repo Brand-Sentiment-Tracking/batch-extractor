@@ -50,7 +50,7 @@ def warc_callback(*args):
     pass
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
 
     os.makedirs(WARC_DIRECTORY, exist_ok=True)
     os.makedirs(ARTICLE_DIRECTORY, exist_ok=True)
@@ -65,6 +65,11 @@ if __name__ == "__main__":
 
     logging.info(f"Downloading articles crawled between "
                  f"{start_date} and {end_date}.")
+
+    #logging.info(f"Extracting from: \n{'\n\t'.join(VALID_HOSTS)}")
+    logging.info(f"Continuing after error? {continue_after_error}")
+    logging.info(f"warc directory: {WARC_DIRECTORY}")
+    logging.info(f"Article directory: {ARTICLE_DIRECTORY}")
 
     cc.crawl_from_commoncrawl(
         valid_hosts=VALID_HOSTS,

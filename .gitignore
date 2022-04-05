@@ -1,3 +1,5 @@
 articles/
+
 .vscode/
 .DS_Store
+.python-version
