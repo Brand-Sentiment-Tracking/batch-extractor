@@ -37,7 +37,7 @@ def article_callback(article, spark, sc):
         os.makedirs(subdirectory_path)
 
     try:
-        with open(filepath, 'w')
+        with open(filepath, 'w'):
             json.dumps(article.__dict__, ensure_ascii=False) #
             spark_df = spark.read.json(sc.parallelize([data])) #
             spark_df.write.parquet(f"{filepath}.parquet") #
