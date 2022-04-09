@@ -37,15 +37,14 @@ def article_callback(article, spark, sc):
         os.makedirs(subdirectory_path)
 
     try:
-        with open(filepath, 'w'):
-            json.dumps(article.__dict__, ensure_ascii=False) #
-            spark_df = spark.read.json(sc.parallelize([data])) #
-            spark_df.write.parquet(f"{filepath}.parquet") #
+        data = json.dumps(article.__dict__, ensure_ascii=False)
+        spark_df = spark.read.json(sc.parallelize([data]))
+        spark_df.write.mode('append').partitionBy("date_download","language").parquet(f"{S3_BUCKET_NAME}.parquet")
         
     except UnicodeEncodeError:
         logging.error(f"Failed to save {name} due to ascii encoding error.")
 
-    upload_to_bucket(filepath, s3_filename)
+    # upload_to_bucket(filepath, s3_filename)
 
 def warc_callback(*args):
     pass
@@ -73,8 +72,8 @@ if __name__ == "__main__":
     logging.info(f"warc directory: {WARC_DIRECTORY}")
     logging.info(f"Article directory: {ARTICLE_DIRECTORY}")
 
-    spark = SparkSession.builder.appName("JsonToParquetPyspark").getOrCreate() #
-    sc = SparkContext.getOrCreate(SparkConf()) #
+    spark = SparkSession.builder.appName("JsonToParquetPyspark").getOrCreate()
+    sc = SparkContext.getOrCreate(SparkConf())
 
     cc.crawl_from_commoncrawl(
         valid_hosts=VALID_HOSTS,
