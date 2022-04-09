@@ -4,16 +4,17 @@ import json
 import logging
 import re
 
+from pyspark.sql import SparkSession
+from pyspark import SparkConf, SparkContext
+
 from datetime import datetime, date, timedelta
 from newsplease.crawler import commoncrawl_crawler as cc
 from botocore.exceptions import ClientError
 
 ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
-
 WARC_DIRECTORY = os.environ.get("WARC_DIRECTORY")
 ARTICLE_DIRECTORY = os.environ.get("ARTICLE_DIRECTORY")
 VALID_HOSTS = json.loads(os.environ.get("VALID_HOSTS"))
-
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 
 s3 = boto3.client("s3")
@@ -24,11 +25,11 @@ def upload_to_bucket(filepath, filename):
     except ClientError as e:
         logging.error(e)
 
-def article_callback(article):
+def article_callback(article, spark, sc):
     name = re.sub(r"[^\w\.]+", "_", article.url)
     subdirectory = date.today().isoformat()
 
-    s3_filename = os.path.join(subdirectory, f"{name}.json")
+    s3_filename = os.path.join(subdirectory, name)
     subdirectory_path = os.path.join(ARTICLE_DIRECTORY, subdirectory)
     filepath = os.path.join(ARTICLE_DIRECTORY, s3_filename)
     
@@ -36,9 +37,11 @@ def article_callback(article):
         os.makedirs(subdirectory_path)
 
     try:
-        with open(filepath, 'w') as article_fp:
-            json.dump(article.__dict__, article_fp, default=str,
-                    sort_keys=True, indent=4, ensure_ascii=False)
+        with open(filepath, 'w')
+            json.dumps(article.__dict__, ensure_ascii=False) #
+            spark_df = spark.read.json(sc.parallelize([data])) #
+            spark_df.write.parquet(f"{filepath}.parquet") #
+        
     except UnicodeEncodeError:
         logging.error(f"Failed to save {name} due to ascii encoding error.")
 
@@ -46,6 +49,7 @@ def article_callback(article):
 
 def warc_callback(*args):
     pass
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
@@ -68,6 +72,9 @@ if __name__ == "__main__":
     logging.info(f"Continuing after error? {continue_after_error}")
     logging.info(f"warc directory: {WARC_DIRECTORY}")
     logging.info(f"Article directory: {ARTICLE_DIRECTORY}")
+
+    spark = SparkSession.builder.appName("JsonToParquetPyspark").getOrCreate() #
+    sc = SparkContext.getOrCreate(SparkConf()) #
 
     cc.crawl_from_commoncrawl(
         valid_hosts=VALID_HOSTS,

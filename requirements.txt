@@ -1,3 +1,4 @@
 news-please
 python-dateutil
 boto3
+pyspark
