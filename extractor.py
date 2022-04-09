@@ -27,14 +27,6 @@ def upload_to_bucket(filepath, filename):
 
 def article_callback(article, spark, sc):
     name = re.sub(r"[^\w\.]+", "_", article.url)
-    subdirectory = date.today().isoformat()
-
-    s3_filename = os.path.join(subdirectory, name)
-    subdirectory_path = os.path.join(ARTICLE_DIRECTORY, subdirectory)
-    filepath = os.path.join(ARTICLE_DIRECTORY, s3_filename)
-    
-    if not os.path.exists(subdirectory_path):
-        os.makedirs(subdirectory_path)
 
     try:
         data = json.dumps(article.__dict__, ensure_ascii=False)
