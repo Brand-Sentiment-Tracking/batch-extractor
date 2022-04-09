@@ -1,3 +1,5 @@
-news-please
 python-dateutil
+warcio
+langdetect
+newspaper3k
 boto3
