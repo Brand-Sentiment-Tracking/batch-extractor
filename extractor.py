@@ -42,9 +42,16 @@ def article_callback(article):
     name = re.sub(r"[^\w\.]+", "_", article.url)
 
     try:
-        data = json.dumps(article.__dict__, ensure_ascii=False)
+        data = json.dumps({"url": article.url,
+                            "date_publish": article.publish_date,
+                            "title": article.title,
+                            "source_domain": article.source_url,
+                            "maintext": article.text,
+                            "date_crawled": 
+                            "language": article.config.get_language()},
+        ensure_ascii=False)
         spark_df = spark.read.json(sc.parallelize([data]))
-        spark_df.write.mode('append').partitionBy("date_download","language").parquet(f"{S3_BUCKET_NAME}.parquet")
+        spark_df.write.mode('append').partitionBy("date_crawled","language").parquet(f"{S3_BUCKET_NAME}.parquet")
         
     except UnicodeEncodeError:
         logging.error(f"Failed to save {name} due to ascii encoding error.")
