@@ -21,14 +21,20 @@ AWS_SECRET_ACCESS_KEY = environ.get("AWS_SECRET_ACCESS_KEY")
 
 logging.basicConfig(level=DEBUG if ENVIRONMENT != "prod" else INFO)
 
+# spark configuration
+conf = SparkConf().set('spark.executor.extraJavaOptions','-Dcom.amazonaws.services.s3.enableV4=true'). \
+    set('spark.driver.extraJavaOptions;','-Dcom.amazonaws.services.s3.enableV4=true'). \
+    setAppName('pyspark_aws').setMaster('local[*]')
+
 spark = SparkSession.builder.appName("ArticleToParquet").getOrCreate()
-sc = SparkContext.getOrCreate(SparkConf())
-spark.sparkContext \
-     .hadoopConfiguration.set("fs.s3a.access.key", AWS_ACCESS_KEY_ID)
-spark.sparkContext \
-     .hadoopConfiguration.set("fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY)
-spark.sparkContext \
-     .hadoopConfiguration.set("fs.s3a.endpoint", "s3.amazonaws.com")
+sc = SparkContext.getOrCreate(conf=conf)
+sc.setSystemProperty('com.amazonaws.services.s3.enableV4', 'true')
+spark.sparkContext._jsc \
+     .hadoopConfiguration().set("fs.s3a.access.key", AWS_ACCESS_KEY_ID)
+spark.sparkContext._jsc \
+     .hadoopConfiguration().set("fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY)
+spark.sparkContext._jsc \
+     .hadoopConfiguration().set("fs.s3a.endpoint", "s3-us-east-1.amazonaws.com")
 
 
 def article_callback(article: Article, date_crawled: datetime):
