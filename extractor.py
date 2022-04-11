@@ -7,7 +7,8 @@ import re
 from datetime import datetime, date, timedelta
 from botocore.exceptions import ClientError
 
-from loader import CCNewsRecordLoader
+from loader import CCNewsArticleLoader
+
 
 ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
 
@@ -18,6 +19,7 @@ VALID_HOSTS = json.loads(os.environ.get("VALID_HOSTS"))
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 
 s3 = boto3.client("s3")
+
 
 def upload_to_bucket(filepath, filename):    
     try:
@@ -45,12 +47,9 @@ def article_callback(article):
 
     upload_to_bucket(filepath, s3_filename)
 
-def warc_callback(*args):
-    pass
 
 if __name__ == "__main__":
-    log_level = logging.DEBUG if ENVIRONMENT != "prod" \
-        else logging.INFO
+    log_level = logging.DEBUG if ENVIRONMENT != "prod" else logging.INFO
 
     logging.basicConfig(level=log_level)
 
@@ -60,7 +59,7 @@ if __name__ == "__main__":
     end_date = datetime.today()
     start_date = end_date - timedelta(days=5)
 
-    loader = CCNewsRecordLoader(article_callback)
+    loader = CCNewsArticleLoader(article_callback)
 
     logging.info(f"Downloading articles crawled between "
                  f"{start_date.date()} and {end_date.date()}.")
