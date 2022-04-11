@@ -57,7 +57,7 @@ class CCNewsArticleLoader:
         self.reset_counts()
 
     @property
-    def article_callback(self) -> Callable[[Article], None]:
+    def article_callback(self) -> Callable[[Article, datetime], None]:
         """`callable`: Called once an article has been extracted.
 
         Note:
@@ -70,13 +70,13 @@ class CCNewsArticleLoader:
         return self.__article_callback
 
     @article_callback.setter
-    def article_callback(self, func: Callable[[Article], None]):
+    def article_callback(self, func: Callable[[Article, datetime], None]):
         if not callable(func):
             raise ValueError("Article callback is not a function.")
 
         self.__article_callback = func
 
-    def __empty_callback(article: Article):
+    def __empty_callback(article: Article, date_crawled: datetime):
         """Default function when an article_callback isn't specified.
 
         Note:
@@ -196,6 +196,17 @@ class CCNewsArticleLoader:
 
         return filenames
 
+    def __extract_date(self, warc_filepath: str) -> datetime:
+        match = self.WARC_FILE_RE.search(warc_filepath)
+
+        if match is None:
+            logging.debug(f"Ignoring '{warc_filepath}'.")
+            return False
+
+        time = match.group("time")
+
+        return datetime.strptime(time, "%Y%m%d%H%M%S")
+
     def __is_within_date(self, warc_filepath: str) -> bool:
         """Checks whether a warc was crawled between the start and end dates.
 
@@ -216,14 +227,7 @@ class CCNewsArticleLoader:
             bool: True if the warc file was crawled within the start and end
                 dates. False otherwise.
         """
-        match = self.WARC_FILE_RE.search(warc_filepath)
-
-        if match is None:
-            logging.debug(f"Ignoring '{warc_filepath}'.")
-            return False
-
-        time = match.group("time")
-        crawl_date = datetime.strptime(time, "%Y%m%d%H%M%S")
+        crawl_date = self.__extract_date(warc_filepath)
 
         return crawl_date >= self.start_date \
             and crawl_date < self.end_date
@@ -296,7 +300,8 @@ class CCNewsArticleLoader:
 
         return any(map(lambda url: fnmatch(source_url, url), self.patterns))
 
-    def extract_article(self, url: str, html: str, language: str):
+    def extract_article(self, url: str, html: str, language: str,
+                        date_crawled: datetime):
         """Extracts the article from its html and update counters.
 
         Once successfully extracted, it is then passed to `article_callback`.
@@ -327,9 +332,9 @@ class CCNewsArticleLoader:
 
         # Conditional here so exceptions in the callback are still raised
         if article.is_parsed:
-            self.article_callback(article)
+            self.article_callback(article, date_crawled)
 
-    def __parse_records(self, warc: HTTPResponse):
+    def __parse_records(self, warc: HTTPResponse, date_crawled: datetime):
         """Iterate through articles from a warc file.
 
         Each record is loaded using warcio, and extracted if:
@@ -356,7 +361,7 @@ class CCNewsArticleLoader:
                 self.__errored += 1
                 continue
 
-            self.extract_article(url, html, language)
+            self.extract_article(url, html, language, date_crawled)
 
     def __load_warc(self, warc_path: str):
         """Downloads and parses a warc file for article extraction.
@@ -370,11 +375,13 @@ class CCNewsArticleLoader:
                 including the CommonCrawl domain).
         """
         warc_url = urljoin(self.CC_DOMAIN, warc_path)
+        date_crawled = self.__extract_date(warc_path)
+
         logging.info(f"Downloading '{warc_url}'")
         response = requests.get(warc_url, stream=True)
 
         if response.ok:
-            self.__parse_records(response.raw)
+            self.__parse_records(response.raw, date_crawled)
         else:
             logging.warn(f"Failed to download warc from '{warc_url}' "
                          f"(status code {response.status_code}).")

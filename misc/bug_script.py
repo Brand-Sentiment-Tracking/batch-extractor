@@ -6,8 +6,10 @@ from newsplease.crawler import commoncrawl_crawler as cc
 
 logging.basicConfig(level=logging.DEBUG)
 
+
 def empty_callback(*args):
     pass
+
 
 today = date.today()
 today_date = datetime(today.year, today.month, today.day)

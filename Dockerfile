@@ -60,10 +60,7 @@ RUN . ./bin/activate && \
 COPY loader.py .
 COPY extractor.py .
 
-ENV WARC_DIRECTORY          '/tmp/warcs/'
-ENV ARTICLE_DIRECTORY       '/tmp/articles/'
-
-ENV VALID_HOSTS             '["*"]'
+ENV URL_PATTERNS            '["*"]'
 
 ENV S3_BUCKET_NAME          'bucket-name'
 ENV AWS_ACCESS_KEY_ID       'access-id'

@@ -1,62 +1,45 @@
 import os
-import boto3
 import json
 import logging
-import re
 
 from pyspark.sql import SparkSession
 from pyspark import SparkConf, SparkContext
 
 from datetime import datetime, timedelta
-from botocore.exceptions import ClientError
 
 from loader import CCNewsArticleLoader
+from newspaper import Article
 
 
 ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
-WARC_DIRECTORY = os.environ.get("WARC_DIRECTORY")
-ARTICLE_DIRECTORY = os.environ.get("ARTICLE_DIRECTORY")
-VALID_HOSTS = json.loads(os.environ.get("VALID_HOSTS"))
+URL_PATTERNS = json.loads(os.environ.get("URL_PATTERNS"))
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 
-log_level = logging.DEBUG if ENVIRONMENT != "prod" else logging.INFO
+logging.basicConfig(level=logging.DEBUG if ENVIRONMENT != "prod"
+                    else logging.INFO)
 
-logging.basicConfig(level=log_level)
-
-os.makedirs(WARC_DIRECTORY, exist_ok=True)
-os.makedirs(ARTICLE_DIRECTORY, exist_ok=True)
-
-s3 = boto3.client("s3")
-
-spark = SparkSession.builder.appName("JsonToParquetPyspark").getOrCreate()
+spark = SparkSession.builder.appName("ArticleToParquet").getOrCreate()
 sc = SparkContext.getOrCreate(SparkConf())
 
 
-def upload_to_bucket(filepath, filename):    
-    try:
-        s3.upload_file(filepath, S3_BUCKET_NAME, filename)
-    except ClientError as e:
-        logging.error(e)
+def article_callback(article: Article, date_crawled: datetime):
+    date_published = article.publish_date.isoformat() \
+        if article.publish_date is not None else None
 
-def article_callback(article):
-    name = re.sub(r"[^\w\.]+", "_", article.url)
+    data = {
+        "url": article.url,
+        "date_publish": date_published,
+        "title": article.title,
+        "source_domain": article.source_url,
+        "maintext": article.text,
+        "date_crawled": date_crawled.isoformat(),
+        "language": article.config.get_language()
+    }
 
-    try:
-        data = json.dumps({"url": article.url,
-                            "date_publish": article.publish_date,
-                            "title": article.title,
-                            "source_domain": article.source_url,
-                            "maintext": article.text,
-                            "date_crawled": 
-                            "language": article.config.get_language()},
-        ensure_ascii=False)
-        spark_df = spark.read.json(sc.parallelize([data]))
-        spark_df.write.mode('append').partitionBy("date_crawled","language").parquet(f"{S3_BUCKET_NAME}.parquet")
-        
-    except UnicodeEncodeError:
-        logging.error(f"Failed to save {name} due to ascii encoding error.")
-
-    # upload_to_bucket(filepath, s3_filename)
+    spark_df = spark.read.json(sc.parallelize([json.dumps(data)]))
+    spark_df.write.mode('append') \
+        .partitionBy("date_crawled", "language") \
+            .parquet(f"{S3_BUCKET_NAME}.parquet")
 
 
 end_date = datetime.today()
@@ -67,4 +50,4 @@ loader = CCNewsArticleLoader(article_callback)
 logging.info(f"Downloading articles crawled between "
              f"{start_date.date()} and {end_date.date()}.")
 
-loader.download_articles(VALID_HOSTS, start_date, end_date)
+loader.download_articles(URL_PATTERNS, start_date, end_date)
