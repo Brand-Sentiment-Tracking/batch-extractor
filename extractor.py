@@ -1,26 +1,41 @@
-import os
 import json
 import logging
 
-from pyspark.sql import SparkSession
-from pyspark import SparkConf, SparkContext
-
 from datetime import datetime, timedelta
+
+from os import environ
+from logging import INFO, DEBUG
+
+from pyspark import SparkConf, SparkContext
+from pyspark.sql import SparkSession, Row, types
+
+from collections import OrderedDict
 
 from loader import CCNewsArticleLoader
 from newspaper import Article
 
 
-ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
-URL_PATTERNS = json.loads(os.environ.get("URL_PATTERNS"))
-S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
+ENVIRONMENT = environ.get("ENVIRONMENT_TYPE")
+URL_PATTERNS = json.loads(environ.get("URL_PATTERNS"))
+S3_BUCKET_NAME = environ.get("S3_BUCKET_NAME")
 
-logging.basicConfig(level=logging.DEBUG if ENVIRONMENT != "prod"
-                    else logging.INFO)
+logging.basicConfig(level=DEBUG if ENVIRONMENT != "prod" else INFO)
 
 spark = SparkSession.builder.appName("ArticleToParquet").getOrCreate()
-sc = SparkContext.getOrCreate(SparkConf())
+context = SparkContext.getOrCreate(SparkConf())
 
+schema = types.StructType([
+    types.StructField('url', types.StringType(), False),
+    types.StructField('date_publish', types.StringType(), True),
+    types.StructField('title', types.StringType(), True),
+    types.StructField('source_domain', types.StringType(), False),
+    types.StructField('main_text', types.StringType(), True),
+    types.StructField('date_crawled', types.StringType(), False),
+    types.StructField('language', types.StringType(), False),
+])
+
+def dict_to_row(d):
+    return Row(**OrderedDict(sorted(d.items())))
 
 def article_callback(article: Article, date_crawled: datetime):
     date_published = article.publish_date.isoformat() \
@@ -30,14 +45,16 @@ def article_callback(article: Article, date_crawled: datetime):
         "url": article.url,
         "date_publish": date_published,
         "title": article.title,
-        "source_domain": article.source_url,
+        "source_domain": article.source_url, # What is the difference between this and url?
         "maintext": article.text,
         "date_crawled": date_crawled.isoformat(),
         "language": article.config.get_language()
     }
 
-    spark_df = spark.read.json(sc.parallelize([json.dumps(data)]))
-    spark_df.write.mode('append') \
+    df = context.parallelize([data]) \
+        .map(dict_to_row).toDF()
+
+    df.write.mode('append') \
         .partitionBy("date_crawled", "language") \
             .parquet(f"{S3_BUCKET_NAME}.parquet")
 
