@@ -19,7 +19,17 @@ ARTICLE_DIRECTORY = os.environ.get("ARTICLE_DIRECTORY")
 VALID_HOSTS = json.loads(os.environ.get("VALID_HOSTS"))
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 
+log_level = logging.DEBUG if ENVIRONMENT != "prod" else logging.INFO
+
+logging.basicConfig(level=log_level)
+
+os.makedirs(WARC_DIRECTORY, exist_ok=True)
+os.makedirs(ARTICLE_DIRECTORY, exist_ok=True)
+
 s3 = boto3.client("s3")
+
+spark = SparkSession.builder.appName("JsonToParquetPyspark").getOrCreate()
+sc = SparkContext.getOrCreate(SparkConf())
 
 
 def upload_to_bucket(filepath, filename):    
@@ -28,7 +38,7 @@ def upload_to_bucket(filepath, filename):
     except ClientError as e:
         logging.error(e)
 
-def article_callback(article, spark, sc):
+def article_callback(article):
     name = re.sub(r"[^\w\.]+", "_", article.url)
 
     try:
@@ -42,24 +52,12 @@ def article_callback(article, spark, sc):
     # upload_to_bucket(filepath, s3_filename)
 
 
+end_date = datetime.today()
+start_date = end_date - timedelta(days=5)
 
-if __name__ == "__main__":
-    log_level = logging.DEBUG if ENVIRONMENT != "prod" else logging.INFO
+loader = CCNewsArticleLoader(article_callback)
 
-    logging.basicConfig(level=log_level)
+logging.info(f"Downloading articles crawled between "
+             f"{start_date.date()} and {end_date.date()}.")
 
-    os.makedirs(WARC_DIRECTORY, exist_ok=True)
-    os.makedirs(ARTICLE_DIRECTORY, exist_ok=True)
-
-    end_date = datetime.today()
-    start_date = end_date - timedelta(days=5)
-
-    loader = CCNewsArticleLoader(article_callback)
-
-    spark = SparkSession.builder.appName("JsonToParquetPyspark").getOrCreate()
-    sc = SparkContext.getOrCreate(SparkConf())
-
-    logging.info(f"Downloading articles crawled between "
-                 f"{start_date.date()} and {end_date.date()}.")
-
-    loader.download_articles(VALID_HOSTS, start_date, end_date)
+loader.download_articles(VALID_HOSTS, start_date, end_date)
