@@ -1,22 +1,23 @@
-import os
 import json
 import logging
 
-from pyspark.sql import SparkSession
-from pyspark import SparkConf, SparkContext
-
 from datetime import datetime, timedelta
+
+from os import environ
+from logging import INFO, DEBUG
+
+from pyspark import SparkConf, SparkContext
+from pyspark.sql import SparkSession
 
 from loader import CCNewsArticleLoader
 from newspaper import Article
 
 
-ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
-URL_PATTERNS = json.loads(os.environ.get("URL_PATTERNS"))
-S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
+ENVIRONMENT = environ.get("ENVIRONMENT_TYPE")
+URL_PATTERNS = json.loads(environ.get("URL_PATTERNS"))
+S3_BUCKET_NAME = environ.get("S3_BUCKET_NAME")
 
-logging.basicConfig(level=logging.DEBUG if ENVIRONMENT != "prod"
-                    else logging.INFO)
+logging.basicConfig(level=DEBUG if ENVIRONMENT != "prod" else INFO)
 
 spark = SparkSession.builder.appName("ArticleToParquet").getOrCreate()
 sc = SparkContext.getOrCreate(SparkConf())
