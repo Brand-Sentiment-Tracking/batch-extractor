@@ -23,7 +23,7 @@ from newspaper import Article
 from newspaper.utils import get_available_languages
 
 
-class CCNewsRecordLoader:
+class CCNewsArticleLoader:
     """Load and parse articles from CommonCrawl News Archive.
 
     Note:
@@ -54,7 +54,7 @@ class CCNewsRecordLoader:
         self.__start_date = None
         self.__end_date = None
 
-        self.__reset_counts()
+        self.reset_counts()
 
     @property
     def article_callback(self) -> Callable[[Article], None]:
@@ -157,7 +157,8 @@ class CCNewsRecordLoader:
         """`int`: The number of articles that errored during extraction."""
         return self.__errored
 
-    def __reset_counts(self):
+    def reset_counts(self):
+        """Reset the counters for extracted/discarded/errored to zero."""
         self.__extracted = 0
         self.__discarded = 0
         self.__errored = 0
@@ -256,9 +257,9 @@ class CCNewsRecordLoader:
         """
         filenames = list()
 
-        for dt in rrule(MONTHLY, self.start_date, until=self.end_date):
-            logging.info(f"Downloading warc paths for {dt.date()}.")
-            filenames.extend(self.__load_warc_paths(dt.month, dt.year))
+        for d in rrule(MONTHLY, self.start_date, until=self.end_date):
+            logging.info(f"Downloading warc paths for {d.strftime('%b %Y')}.")
+            filenames.extend(self.__load_warc_paths(d.month, d.year))
 
         return self.__filter_warc_paths(filenames)
 
@@ -283,17 +284,19 @@ class CCNewsRecordLoader:
         source_url = record.rec_headers.get_header("WARC-Target-URI")
         content_string = record.http_headers.get_header('Content-Type')
 
+        if source_url is None or content_string is None:
+            return False
+
         content = self.CONTENT_RE.match(content_string)
 
-        if content is None or source_url is None \
-            or content.group("mime") != "text/html" \
+        if content is None or content.group("mime") != "text/html" \
                 or content.group("charset").lower() != "utf-8":
 
             return False
 
         return any(map(lambda url: fnmatch(source_url, url), self.patterns))
 
-    def __extract_article(self, url: str, html: str, language: str):
+    def extract_article(self, url: str, html: str, language: str):
         """Extracts the article from its html and update counters.
 
         Once successfully extracted, it is then passed to `article_callback`.
@@ -306,6 +309,11 @@ class CCNewsRecordLoader:
             html (str): The complete HTML structure of the record.
             language (str): The two-char language code of the record.
         """
+        if language not in self.SUPPORTED_LANGUAGES:
+            logging.debug(f"Language not supported for '{url}'")
+            self.__discarded += 1
+            return
+
         article = Article(url, language=language)
 
         try:
@@ -345,14 +353,10 @@ class CCNewsRecordLoader:
                 language = langdetect.detect(html)
             except UnicodeDecodeError:
                 logging.debug(f"Couldn't decode '{url}'")
+                self.__errored += 1
                 continue
 
-            if language not in self.SUPPORTED_LANGUAGES:
-                logging.debug(f"Language not supported for '{url}'")
-                self.__discarded += 1
-                continue
-
-            self.__extract_article(url, html, language)
+            self.extract_article(url, html, language)
 
     def __load_warc(self, warc_path: str):
         """Downloads and parses a warc file for article extraction.
@@ -395,8 +399,6 @@ class CCNewsRecordLoader:
         self.start_date = start_date
 
         warc_paths = self.__retrieve_warc_paths()
-
-        self.__reset_counts()
 
         for warc in warc_paths:
             self.__load_warc(warc)

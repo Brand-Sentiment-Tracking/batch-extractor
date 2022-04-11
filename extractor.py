@@ -10,7 +10,8 @@ from pyspark import SparkConf, SparkContext
 from datetime import datetime, timedelta
 from botocore.exceptions import ClientError
 
-from loader import CCNewsRecordLoader
+from loader import CCNewsArticleLoader
+
 
 ENVIRONMENT = os.environ.get("ENVIRONMENT_TYPE")
 WARC_DIRECTORY = os.environ.get("WARC_DIRECTORY")
@@ -19,6 +20,7 @@ VALID_HOSTS = json.loads(os.environ.get("VALID_HOSTS"))
 S3_BUCKET_NAME = os.environ.get("S3_BUCKET_NAME")
 
 s3 = boto3.client("s3")
+
 
 def upload_to_bucket(filepath, filename):    
     try:
@@ -39,13 +41,10 @@ def article_callback(article, spark, sc):
 
     # upload_to_bucket(filepath, s3_filename)
 
-def warc_callback(*args):
-    pass
 
 
 if __name__ == "__main__":
-    log_level = logging.DEBUG if ENVIRONMENT != "prod" \
-        else logging.INFO
+    log_level = logging.DEBUG if ENVIRONMENT != "prod" else logging.INFO
 
     logging.basicConfig(level=log_level)
 
@@ -55,7 +54,7 @@ if __name__ == "__main__":
     end_date = datetime.today()
     start_date = end_date - timedelta(days=5)
 
-    loader = CCNewsRecordLoader(article_callback)
+    loader = CCNewsArticleLoader(article_callback)
 
     spark = SparkSession.builder.appName("JsonToParquetPyspark").getOrCreate()
     sc = SparkContext.getOrCreate(SparkConf())
