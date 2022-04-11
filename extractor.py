@@ -16,11 +16,19 @@ from newspaper import Article
 ENVIRONMENT = environ.get("ENVIRONMENT_TYPE")
 URL_PATTERNS = json.loads(environ.get("URL_PATTERNS"))
 S3_BUCKET_NAME = environ.get("S3_BUCKET_NAME")
+AWS_ACCESS_KEY_ID = environ.get("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = environ.get("AWS_SECRET_ACCESS_KEY")
 
 logging.basicConfig(level=DEBUG if ENVIRONMENT != "prod" else INFO)
 
 spark = SparkSession.builder.appName("ArticleToParquet").getOrCreate()
 sc = SparkContext.getOrCreate(SparkConf())
+spark.sparkContext \
+     .hadoopConfiguration.set("fs.s3a.access.key", AWS_ACCESS_KEY_ID)
+spark.sparkContext \
+     .hadoopConfiguration.set("fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY)
+spark.sparkContext \
+     .hadoopConfiguration.set("fs.s3a.endpoint", "s3.amazonaws.com")
 
 
 def article_callback(article: Article, date_crawled: datetime):
