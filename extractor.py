@@ -40,7 +40,7 @@ def article_callback(article: Article, date_crawled: datetime):
     spark_df = spark.read.json(sc.parallelize([json.dumps(data)]))
     spark_df.write.mode('append') \
         .partitionBy("date_crawled", "language") \
-            .parquet(f"{S3_BUCKET_NAME}.parquet")
+        .parquet(f"{S3_BUCKET_NAME}.parquet")
 
 
 end_date = datetime.today()

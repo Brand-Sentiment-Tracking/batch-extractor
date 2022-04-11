@@ -35,7 +35,7 @@ RUN wget -qO- https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPAR
 RUN echo spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.EC2ContainerCredentialsProviderWrapper > /opt/spark/conf/spark-defaults.conf
 
 # Add hadoop-aws and aws-sdk
-RUN wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_VERSION}/hadoop-aws-${HADOOP_VERSION}.jar -P /opt/spark/jars/ && \ 
+RUN wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_VERSION}/hadoop-aws-${HADOOP_VERSION}.jar -P /opt/spark/jars/ && \
     wget https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/${AWS_SDK_VERSION}/aws-java-sdk-bundle-${AWS_SDK_VERSION}.jar -P /opt/spark/jars/
 
 ENV SPARK_HOME=/opt/spark
@@ -60,13 +60,13 @@ RUN . ./bin/activate && \
 COPY loader.py .
 COPY extractor.py .
 
-ENV URL_PATTERNS            '["*"]'
+ENV URL_PATTERNS            '["*business*"]'
 
-ENV S3_BUCKET_NAME          'bucket-name'
-ENV AWS_ACCESS_KEY_ID       'access-id'
-ENV AWS_SECRET_ACCESS_KEY   'secret-key'
+ENV S3_BUCKET_NAME          's3a://extracted-news-articles'
+ENV AWS_ACCESS_KEY_ID       'AWS_ACCESS_KEY_ID'
+ENV AWS_SECRET_ACCESS_KEY   'AWS_SECRET_ACCESS_KEY'
 
-ENV ENVIRONMENT_TYPE        'dev'
+ENV ENVIRONMENT_TYPE        'prod'
 
 EXPOSE 8080
 EXPOSE 443
