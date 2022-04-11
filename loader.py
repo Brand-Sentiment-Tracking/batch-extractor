@@ -356,7 +356,7 @@ class CCNewsArticleLoader:
             try:
                 html = record.content_stream().read().decode("utf-8")
                 language = langdetect.detect(html)
-            except UnicodeDecodeError:
+            except Exception:
                 logging.debug(f"Couldn't decode '{url}'")
                 self.__errored += 1
                 continue
