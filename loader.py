@@ -6,7 +6,7 @@ import langdetect
 
 import os.path
 
-from typing import Callable
+from typing import Callable, Dict
 
 from datetime import datetime
 from dateutil.rrule import rrule, MONTHLY
@@ -43,6 +43,8 @@ class CCNewsArticleLoader:
 
     SUPPORTED_LANGUAGES = get_available_languages()
 
+    ArticleCallback = Callable[[Article, datetime, Dict[str, int]], None]
+
     def __init__(self, article_callback=None):
         # Set article_callback to the empty callback if no function is passed
         self.article_callback = article_callback \
@@ -54,10 +56,10 @@ class CCNewsArticleLoader:
         self.__start_date = None
         self.__end_date = None
 
-        self.reset_counts()
+        self.reset_counters()
 
     @property
-    def article_callback(self) -> Callable[[Article, datetime], None]:
+    def article_callback(self) -> ArticleCallback:
         """`callable`: Called once an article has been extracted.
 
         Note:
@@ -70,13 +72,14 @@ class CCNewsArticleLoader:
         return self.__article_callback
 
     @article_callback.setter
-    def article_callback(self, func: Callable[[Article, datetime], None]):
+    def article_callback(self, func: ArticleCallback):
         if not callable(func):
             raise ValueError("Article callback is not a function.")
 
         self.__article_callback = func
 
-    def __empty_callback(article: Article, date_crawled: datetime):
+    def __empty_callback(article: Article, date_crawled: datetime,
+                         counters: Dict[str, int]):
         """Default function when an article_callback isn't specified.
 
         Note:
@@ -157,7 +160,16 @@ class CCNewsArticleLoader:
         """`int`: The number of articles that errored during extraction."""
         return self.__errored
 
-    def reset_counts(self):
+    @property
+    def counters(self) -> Dict[str, int]:
+        """Return a dictionary of extracted/discarded/errored counters."""
+        return {
+            "extracted": self.extracted,
+            "discarded": self.discarded,
+            "errored": self.errored
+        }
+
+    def reset_counters(self):
         """Reset the counters for extracted/discarded/errored to zero."""
         self.__extracted = 0
         self.__discarded = 0
@@ -332,7 +344,7 @@ class CCNewsArticleLoader:
 
         # Conditional here so exceptions in the callback are still raised
         if article.is_parsed:
-            self.article_callback(article, date_crawled)
+            self.article_callback(article, date_crawled, self.counters)
 
     def __parse_records(self, warc: HTTPResponse, date_crawled: datetime):
         """Iterate through articles from a warc file.
@@ -356,11 +368,11 @@ class CCNewsArticleLoader:
             try:
                 html = record.content_stream().read().decode("utf-8")
                 language = langdetect.detect(html)
-            except UnicodeDecodeError:
+            except Exception:
                 logging.debug(f"Couldn't decode '{url}'")
                 self.__errored += 1
                 continue
-
+            
             self.extract_article(url, html, language, date_crawled)
 
     def __load_warc(self, warc_path: str):

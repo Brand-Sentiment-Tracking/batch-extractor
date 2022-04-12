@@ -3,4 +3,3 @@ pyspark
 warcio
 langdetect
 newspaper3k
-boto3
