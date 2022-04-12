@@ -23,7 +23,7 @@ from newspaper import Article
 from newspaper.utils import get_available_languages
 
 
-class CCNewsArticleLoader:
+class CommonCrawlArticleExtractor:
     """Load and parse articles from CommonCrawl News Archive.
 
     Note:
