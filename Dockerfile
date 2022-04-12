@@ -32,7 +32,7 @@ RUN wget -qO- https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPAR
     mv /opt/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION_SHORT} /opt/spark
 
 # Configure Spark to respect IAM role given to container
-RUN echo spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.EC2ContainerCredentialsProviderWrapper > /opt/spark/conf/spark-defaults.conf
+RUN echo spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.AWSCredentialsProviderWrapper > /opt/spark/conf/spark-defaults.conf
 
 # Add hadoop-aws and aws-sdk
 RUN wget https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/${HADOOP_VERSION}/hadoop-aws-${HADOOP_VERSION}.jar -P /opt/spark/jars/ && \
@@ -62,7 +62,8 @@ COPY extractor.py .
 
 ENV URL_PATTERNS            '["*business*"]'
 
-ENV S3_BUCKET_NAME          's3a://extracted-news-articles'
+ENV S3_BUCKET_NAME          'extracted-news-articles'
+ENV PARQUET_FILE            'v1.parquet'
 ENV AWS_ACCESS_KEY_ID       'AWS_ACCESS_KEY_ID'
 ENV AWS_SECRET_ACCESS_KEY   'AWS_SECRET_ACCESS_KEY'
 
