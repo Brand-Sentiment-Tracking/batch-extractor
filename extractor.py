@@ -14,37 +14,19 @@ from newspaper import Article
 
 
 ENVIRONMENT = environ.get("ENVIRONMENT_TYPE")
+
 S3_BUCKET_NAME = environ.get("S3_BUCKET_NAME")
 PARQUET_FILE = environ.get("PARQUET_FILE")
 
-AWS_ACCESS_KEY_ID = environ.get("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = environ.get("AWS_SECRET_ACCESS_KEY")
-
 URL_PATTERNS = json.loads(environ.get("URL_PATTERNS"))
 
-logging.basicConfig(level=DEBUG if ENVIRONMENT != "prod" else INFO)
-
-"""
-# spark configuration
-conf = SparkConf().set('spark.executor.extraJavaOptions','-Dcom.amazonaws.services.s3.enableV4=true'). \
-    set('spark.driver.extraJavaOptions;','-Dcom.amazonaws.services.s3.enableV4=true'). \
-    setAppName('pyspark_aws').setMaster('local[*]')
-"""
+logging.basicConfig(level=DEBUG if ENVIRONMENT != "production" else INFO)
 
 spark = SparkSession.builder.appName("ArticleToParquet").getOrCreate()
 context = SparkContext.getOrCreate(SparkConf())
 
-"""
-sc.setSystemProperty('com.amazonaws.services.s3.enableV4', 'true')
-spark.sparkContext._jsc \
-     .hadoopConfiguration().set("fs.s3a.access.key", AWS_ACCESS_KEY_ID)
-spark.sparkContext._jsc \
-     .hadoopConfiguration().set("fs.s3a.secret.key", AWS_SECRET_ACCESS_KEY)
-spark.sparkContext._jsc \
-     .hadoopConfiguration().set("fs.s3a.endpoint", "s3-us-east-1.amazonaws.com")
-"""
-
 def article_callback(article: Article, date_crawled: datetime):
+
     date_published = article.publish_date.isoformat() \
         if article.publish_date is not None else None
 
@@ -65,7 +47,7 @@ def article_callback(article: Article, date_crawled: datetime):
 
 
 end_date = datetime.today()
-start_date = end_date - timedelta(days=5)
+start_date = end_date - timedelta(days=1)
 
 loader = CCNewsArticleLoader(article_callback)
 
