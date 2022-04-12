@@ -15,11 +15,11 @@ url_patterns = json.loads(environ.get("URL_PATTERNS"))
 
 extractor = ArticleToParquetS3(bucket_name, parquet_filepath,
                                batch_upload_size)
-        
+
 end_date = datetime.today()
 start_date = end_date - timedelta(days=1)
 
 logging.info(f"Downloading articles crawled between "
-            f"{start_date.date()} and {end_date.date()}.")
+             f"{start_date.date()} and {end_date.date()}.")
 
 extractor.run(url_patterns, start_date, end_date)

@@ -372,7 +372,7 @@ class CommonCrawlArticleExtractor:
                 logging.debug(f"Couldn't decode '{url}'")
                 self.__errored += 1
                 continue
-            
+
             self.extract_article(url, html, language, date_crawled)
 
     def __load_warc(self, warc_path: str):
