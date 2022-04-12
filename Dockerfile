@@ -54,8 +54,8 @@ COPY requirements.txt .
 RUN . ./bin/activate && \
     python3.8 -m pip install -r requirements.txt
 
-COPY loader.py .
-COPY extractor.py .
+COPY extractor/ extractor/
+COPY main.py .
 
 ENV S3_BUCKET_NAME=extracted-news-articles
 ENV PARQUET_FILEPATH=v1-dev.parquet
