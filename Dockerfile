@@ -65,4 +65,4 @@ ENV BATCH_UPLOAD_SIZE=100
 
 ENTRYPOINT . ./bin/activate && spark-submit \
            --conf spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.DefaultAWSCredentialsProviderChain \
-           extractor.py
+           main.py

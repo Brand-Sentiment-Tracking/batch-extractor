@@ -68,7 +68,12 @@ class ArticleToParquetS3:
 
     @property
     def bucket_name(self) -> str:
-        """`str`: The S3 bucket name to push the parquet files."""
+        """`str`: The S3 bucket name to push the parquet files.
+        
+        The setter will raise a ValueError if the new name is not a string.
+        Once updated, the method will also redefine the bucket URL with the
+        correct bucket name.
+        """
         return self.__bucket_name
 
     @bucket_name.setter
@@ -83,6 +88,12 @@ class ArticleToParquetS3:
 
     @property
     def parquet_file(self) -> str:
+        """`str`: The parquet filepath to push to (from the S3 bucket root).
+        
+        The setter will raise a ValueError if the new name is not a string.
+        Once updated, the method will also redefine the bucket URL with the
+        correct parquet filepath.
+        """
         return self.__parquet_file
 
     @parquet_file.setter
