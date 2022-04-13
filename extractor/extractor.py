@@ -6,7 +6,7 @@ import langdetect
 
 import os.path
 
-from typing import Callable, Dict
+from typing import Callable, List, Dict
 
 from datetime import datetime
 from dateutil.rrule import rrule, MONTHLY
@@ -91,7 +91,7 @@ class CommonCrawlArticleExtractor:
         return
 
     @property
-    def patterns(self) -> "list[str]":
+    def patterns(self) -> List[str]:
         """`list` of `str` containing the url patterns to match the
         article URL against when filtering.
 
@@ -101,7 +101,7 @@ class CommonCrawlArticleExtractor:
         return self.__patterns
 
     @patterns.setter
-    def patterns(self, patterns: "list[str]"):
+    def patterns(self, patterns: List[str]):
         if type(patterns) != list:
             raise ValueError("URL patterns is not a list.")
         elif any(map(lambda x: type(x) != str, patterns)):
@@ -175,7 +175,7 @@ class CommonCrawlArticleExtractor:
         self.__discarded = 0
         self.__errored = 0
 
-    def __load_warc_paths(self, month: int, year: int) -> "list[str]":
+    def __load_warc_paths(self, month: int, year: int) -> List[str]:
         """Returns a list of warc files for a single month/year archive.
 
         Note:
@@ -187,7 +187,7 @@ class CommonCrawlArticleExtractor:
             year (int): The year to index. Must be 4 digits.
 
         Returns:
-            list[str]: A list of warc files in the archive for records
+            List[str]: A list of warc files in the archive for records
                 crawled in the month and year passed.
         """
         paths_route = os.path.join(self.CC_NEWS_ROUTE, str(year),
@@ -244,7 +244,7 @@ class CommonCrawlArticleExtractor:
         return crawl_date >= self.start_date \
             and crawl_date < self.end_date
 
-    def __filter_warc_paths(self, filepaths: "list[str]") -> "list[str]":
+    def __filter_warc_paths(self, filepaths: List[str]) -> List[str]:
         """Filters the list of warc filepaths to those crawled between the
         start and end dates.
 
@@ -253,14 +253,14 @@ class CommonCrawlArticleExtractor:
                 automatically discarded.
 
         Args:
-            filenames (list[str]): List of warc filepaths to filter.
+            filenames (List[str]): List of warc filepaths to filter.
 
         Returns:
-            list[str]: The filtered list of warc filepaths.
+            List[str]: The filtered list of warc filepaths.
         """
         return list(filter(self.__is_within_date, filepaths))
 
-    def __retrieve_warc_paths(self) -> "list[str]":
+    def __retrieve_warc_paths(self) -> List[str]:
         """Returns a list of warc filepaths from CC-NEWS that were crawled
         between the start and end dates.
 
@@ -269,7 +269,7 @@ class CommonCrawlArticleExtractor:
         warc filename.
 
         Returns:
-            list[str]: A list of warc filepaths.
+            List[str]: A list of warc filepaths.
         """
         filenames = list()
 
@@ -398,7 +398,7 @@ class CommonCrawlArticleExtractor:
             logging.warn(f"Failed to download warc from '{warc_url}' "
                          f"(status code {response.status_code}).")
 
-    def download_articles(self, patterns: "list[str]", start_date: datetime,
+    def download_articles(self, patterns: List[str], start_date: datetime,
                           end_date: datetime):
         """Downloads and extracts articles from CC-NEWS.
 
@@ -407,7 +407,7 @@ class CommonCrawlArticleExtractor:
         - The article was crawled between the start and end dates.
 
         Args:
-            patterns (list[str]): List of URL patterns the article must match.
+            patterns (List[str]): List of URL patterns the article must match.
             start_date (datetime): The earliest date the article must have
                 been crawled.
             end_date (datetime): The latest date the article must have been

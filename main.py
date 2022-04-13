@@ -10,11 +10,10 @@ logging.basicConfig(level=logging.INFO)
 
 bucket_name = environ.get("S3_BUCKET_NAME")
 parquet_filepath = environ.get("PARQUET_FILEPATH")
-batch_upload_size = int(environ.get("BATCH_UPLOAD_SIZE"))
+batch_size = int(environ.get("BATCH_SIZE"))
 url_patterns = json.loads(environ.get("URL_PATTERNS"))
 
-extractor = ArticleToParquetS3(bucket_name, parquet_filepath,
-                               batch_upload_size)
+extractor = ArticleToParquetS3(bucket_name, parquet_filepath, batch_size)
 
 end_date = datetime.today()
 start_date = end_date - timedelta(days=1)
