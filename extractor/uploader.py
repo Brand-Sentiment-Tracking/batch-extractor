@@ -1,5 +1,7 @@
+import logging
+
 from collections import OrderedDict
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from datetime import datetime
 
@@ -11,20 +13,35 @@ from newspaper import Article
 
 
 class ArticleToParquetS3:
+    """Upload extracted articles from CC-NEWS to Amazon S3 as Parquet files.
 
-    KEYS = ["title", "main_text", "url", "source_domain", "date_publish",
-            "date_crawled", "language"]
+    Note:
+        Credentials for AWS are assumed to be held as environment variables.
+        Make sure they are provided either by using the AWS Credentials
+        Provider Wrapper or by exporting `AWS_ACCESS_KEY_ID` and
+        `AWS_SECRET_ACCESS_KEY`.
 
-    def __init__(self, bucket_name: str, parquet_file: str,
-                 upload_batch_size: int,
-                 partitions: Optional[List[str]] = None):
+    Args:
+        bucket_name (str): The name of the bucket on S3 to push to.
+        parquet_file (str): The filepath from the S3 bucket root to the
+            Parquet file to push to.
+        batch_size (int): The number of articles to extract before pushing as
+            a batch.
+        partitions (Tuple[str]): The set of keys to partition the parquet file
+            by. All available keys can be found in `self.KEYS`.
+    """
+    KEYS = ("title", "main_text", "url", "source_domain", "date_publish",
+            "date_crawled", "language")
+
+    def __init__(self, bucket_name: str, parquet_file: str, batch_size: int,
+                 partitions: Optional[Tuple[str]] = None):
 
         self.__bucket_name = None
         self.__parquet_file = None
 
         self.bucket_name = bucket_name
         self.parquet_file = parquet_file
-        self.upload_batch_size = upload_batch_size
+        self.batch_size = batch_size
 
         self.partitions = partitions if partitions is not None \
             else ("date_crawled", "language")
@@ -51,6 +68,7 @@ class ArticleToParquetS3:
 
     @property
     def bucket_name(self) -> str:
+        """`str`: The S3 bucket name to push the parquet files."""
         return self.__bucket_name
 
     @bucket_name.setter
@@ -78,15 +96,15 @@ class ArticleToParquetS3:
             self.update_bucket_url()
 
     @property
-    def upload_batch_size(self) -> int:
-        return self.__upload_batch_size
+    def batch_size(self) -> int:
+        return self.__batch_size
 
-    @upload_batch_size.setter
-    def upload_batch_size(self, size: int):
+    @batch_size.setter
+    def batch_size(self, size: int):
         if type(size) != int or size <= 0:
             raise ValueError("Size is not an integer greater than zero.")
 
-        self.__upload_batch_size = size
+        self.__batch_size = size
 
     @property
     def bucket_url(self) -> str:
@@ -96,11 +114,11 @@ class ArticleToParquetS3:
         self.__bucket_url = f"s3a://{self.bucket_name}/{self.parquet_file}"
 
     @property
-    def partitions(self) -> List[str]:
+    def partitions(self) -> Tuple[str]:
         return self.__partitions
 
     @partitions.setter
-    def partitions(self, keys: List[str]):
+    def partitions(self, keys: Tuple[str]):
         if type(keys) != tuple:
             raise ValueError("Partition keys is not a tuple.")
         elif any(map(lambda k: type(k) != str, keys)):
@@ -132,11 +150,15 @@ class ArticleToParquetS3:
             ])
         )
 
-        if counters["extracted"] % self.upload_batch_size == 0:
+        if counters["extracted"] % self.batch_size == 0:
             self.upload_to_parquet()
             self.articles = list()
 
     def upload_to_parquet(self):
+        if not self.articles:
+            logging.info("No articles available to push to S3.")
+            return
+
         rows = self.context \
             .parallelize(self.articles) \
             .map(self.dict_to_row)
