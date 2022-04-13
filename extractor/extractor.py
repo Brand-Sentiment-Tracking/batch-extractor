@@ -6,7 +6,7 @@ import langdetect
 
 import os.path
 
-from typing import Callable, List, Dict
+from typing import Callable, List, Dict, Optional
 
 from datetime import datetime
 from dateutil.rrule import rrule, MONTHLY
@@ -45,7 +45,7 @@ class CommonCrawlArticleExtractor:
 
     ArticleCallback = Callable[[Article, datetime, Dict[str, int]], None]
 
-    def __init__(self, article_callback=None):
+    def __init__(self, article_callback: Optional[ArticleCallback] = None):
         # Set article_callback to the empty callback if no function is passed
         self.article_callback = article_callback \
             if article_callback is not None \
@@ -163,10 +163,12 @@ class CommonCrawlArticleExtractor:
     @property
     def counters(self) -> Dict[str, int]:
         """Return a dictionary of extracted/discarded/errored counters."""
+        total = self.extracted + self.discarded + self.errored
         return {
             "extracted": self.extracted,
             "discarded": self.discarded,
-            "errored": self.errored
+            "errored": self.errored,
+            "total": total
         }
 
     def reset_counters(self):

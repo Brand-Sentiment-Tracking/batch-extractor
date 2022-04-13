@@ -6,6 +6,8 @@ ARG HADOOP_VERSION=3.2.0
 ARG AWS_SDK_VERSION=1.11.375
 ENV PYTHON_VERSION=3.8.12
 
+RUN yum update kernel
+
 RUN yum -y groupinstall "Development tools"
 RUN yum -y install zlib-devel libffi-devel
 RUN yum -y install bzip2-devel openssl-devel ncurses-devel
@@ -56,11 +58,5 @@ RUN . ./bin/activate && \
 
 COPY extractor/ extractor/
 COPY main.py .
-
-ENV S3_BUCKET_NAME=extracted-news-articles
-ENV PARQUET_FILEPATH=v1-dev.parquet
-
-ENV URL_PATTERNS='["*business*"]'
-ENV BATCH_UPLOAD_SIZE=100
 
 ENTRYPOINT . ./bin/activate && spark-submit main.py
