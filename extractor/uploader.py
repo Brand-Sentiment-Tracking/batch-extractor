@@ -79,7 +79,7 @@ class ArticleToParquetS3:
         self.__bucket_name = name
 
         if self.parquet_file is not None:
-            self.update_bucket_url()
+            self.update_parquet_url()
 
     @property
     def parquet_file(self) -> str:
@@ -93,10 +93,15 @@ class ArticleToParquetS3:
         self.__parquet_file = filename
 
         if self.bucket_name is not None:
-            self.update_bucket_url()
+            self.update_parquet_url()
 
     @property
     def batch_size(self) -> int:
+        """`int`: The number of articles to upload to Amazon S3 in a batch
+        
+        The setter will raise a ValueError if the new batch size is not an
+        integer greater than zero.
+        """
         return self.__batch_size
 
     @batch_size.setter
@@ -107,11 +112,13 @@ class ArticleToParquetS3:
         self.__batch_size = size
 
     @property
-    def bucket_url(self) -> str:
-        return self.__bucket_url
+    def parquet_url(self) -> str:
+        """`str`: The Amazon S3 URL to the parquet file to push to."""
+        return self.__parquet_url
 
-    def update_bucket_url(self):
-        self.__bucket_url = f"s3a://{self.bucket_name}/{self.parquet_file}"
+    def update_parquet_url(self):
+        """Update the parquet URL whenever a new bucket name or parquet file is updated"""
+        self.__parquet_url = f"s3a://{self.bucket_name}/{self.parquet_file}"
 
     @property
     def partitions(self) -> Tuple[str]:
@@ -167,7 +174,7 @@ class ArticleToParquetS3:
 
         articles_df.write.mode('append') \
             .partitionBy(*self.partitions) \
-            .parquet(self.bucket_url)
+            .parquet(self.parquet_url)
 
     def run(self, patterns: List[str], start_date: datetime,
             end_date: datetime):

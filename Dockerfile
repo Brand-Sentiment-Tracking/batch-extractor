@@ -63,6 +63,4 @@ ENV PARQUET_FILEPATH=v1-dev.parquet
 ENV URL_PATTERNS='["*business*"]'
 ENV BATCH_UPLOAD_SIZE=100
 
-ENTRYPOINT . ./bin/activate && \
-           echo 127.0.0.1 $HOSTNAME >> /etc/hosts && \
-           spark-submit main.py
+ENTRYPOINT . ./bin/activate && spark-submit main.py

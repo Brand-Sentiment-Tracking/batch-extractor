@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO)
 
 bucket_name = environ.get("S3_BUCKET_NAME")
 parquet_filepath = environ.get("PARQUET_FILEPATH")
-batch_size = int(environ.get("BATCH_SIZE"))
+batch_size = int(environ.get("BATCH_UPLOAD_SIZE"))
 url_patterns = json.loads(environ.get("URL_PATTERNS"))
 
 extractor = ArticleToParquetS3(bucket_name, parquet_filepath, batch_size)
