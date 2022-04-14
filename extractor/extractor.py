@@ -23,12 +23,8 @@ from newspaper import Article
 from newspaper.utils import get_available_languages
 
 
-class CommonCrawlArticleExtractor:
+class ArticleExtractor:
     """Load and parse articles from CommonCrawl News Archive.
-
-    Note:
-        This is for extracting articles from the CC-NEWS collection. For the
-        CC-MAIN collections, use the `CCMainRecordLoader` class.
 
     Args:
         article_callback (callable): A function that is called once an article

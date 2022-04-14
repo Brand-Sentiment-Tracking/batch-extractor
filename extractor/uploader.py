@@ -9,7 +9,7 @@ from datetime import datetime
 from pyspark import SparkConf, SparkContext
 from pyspark.sql import SparkSession, Row, types
 
-from extractor.extractor import CommonCrawlArticleExtractor
+from extractor.extractor import ArticleExtractor
 from newspaper import Article
 
 
@@ -53,7 +53,7 @@ class ArticleToParquetS3:
         self.batch_size = batch_size
         self.report_every = report_every
 
-        self.extractor = CommonCrawlArticleExtractor(self.add_article)
+        self.extractor = ArticleExtractor(self.add_article)
 
         self.spark = SparkSession.builder \
             .appName("ArticleToParquet") \
@@ -132,8 +132,8 @@ class ArticleToParquetS3:
 
     @partitions.setter
     def partitions(self, keys: Tuple[str]):
-        if type(keys) != tuple:
-            raise ValueError("Partition keys is not a tuple.")
+        if type(keys) != tuple or len(keys) == 0:
+            raise ValueError("Partition keys is not a tuple or is empty.")
         elif any(map(lambda k: type(k) != str, keys)):
             raise ValueError("Not all keys are strings.")
         elif any(map(lambda k: k not in self.KEYS, keys)):
@@ -174,7 +174,8 @@ class ArticleToParquetS3:
 
     def report_counters(self):
         """Report the extracted/discarded/errored/total counters."""
-        message = "CounterReport:"
+        message = "(Counters Report)"
+        
         for name, counter in self.extractor.counters.items():
             message += f" {name}={counter}"
 
