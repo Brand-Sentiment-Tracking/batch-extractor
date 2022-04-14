@@ -9,8 +9,8 @@ from extractor.uploader import ArticleToParquetS3
 logging.basicConfig(level=logging.INFO)
 
 bucket_name = environ.get("S3_BUCKET_NAME")
-parquet_filepath = environ.get("PARQUET_FILEPATH")
-batch_size = environ.get("BATCH_UPLOAD_SIZE")
+parquet_file = environ.get("PARQUET_FILE")
+batch_size = environ.get("BATCH_SIZE")
 
 url_patterns = environ.get("URL_PATTERNS")
 start_date = environ.get("START_DATE")
@@ -33,7 +33,7 @@ else:
     start_date = end_date - timedelta(days=1)
 
 
-uploader = ArticleToParquetS3(bucket_name, parquet_filepath,
+uploader = ArticleToParquetS3(bucket_name, parquet_file,
                               batch_size=batch_size)
 
 logging.info(f"Downloading articles crawled between "

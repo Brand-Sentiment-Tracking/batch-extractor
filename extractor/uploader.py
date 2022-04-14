@@ -1,3 +1,4 @@
+import os
 import logging
 
 from collections import OrderedDict
@@ -21,7 +22,7 @@ class ArticleToParquetS3:
         and `AWS_SECRET_ACCESS_KEY`.
 
     Args:
-        bucket_name (str): The name of the bucket on S3 to push to.
+        bucket (str): The name of the bucket on S3 to push to.
         parquet_file (str): The filepath from the S3 bucket root to the
             Parquet file to push to.
         batch_size (int): The number of articles to extract before pushing as
@@ -32,22 +33,25 @@ class ArticleToParquetS3:
     KEYS = ("title", "main_text", "url", "source_domain", "date_publish",
             "date_crawled", "language")
 
-    def __init__(self, bucket_name: str, parquet_file: str,
+    def __init__(self, bucket: str, parquet_file: str,
+                 local_parquet_dir: str = "./parquet",
                  partitions: Optional[Tuple[str]] = None,
-                 batch_size: Optional[int] = None,
-                 report_every: int = 1000):
+                 batch_size: Optional[int] = 1000,
+                 report_every: Optional[int] = 1000):
 
-        self.__bucket_name = None
+        self.__bucket = None
         self.__parquet_file = None
 
-        self.bucket_name = bucket_name
-        self.parquet_file = parquet_file
-        self.batch_size = batch_size
+        self.bucket = bucket
 
-        self.report_every = report_every
+        self.parquet_file = parquet_file
+        self.local_parquet_dir = local_parquet_dir
 
         self.partitions = partitions if partitions is not None \
             else ("date_crawled", "language")
+
+        self.batch_size = batch_size
+        self.report_every = report_every
 
         self.extractor = CommonCrawlArticleExtractor(self.add_article)
 
@@ -70,19 +74,16 @@ class ArticleToParquetS3:
         self.articles = list()
 
     @property
-    def bucket_name(self) -> str:
+    def bucket(self) -> str:
         """`str`: The S3 bucket name to push the parquet files."""
-        return self.__bucket_name
+        return self.__bucket
 
-    @bucket_name.setter
-    def bucket_name(self, name: str):
+    @bucket.setter
+    def bucket(self, name: str):
         if type(name) != str:
-            raise ValueError("Bucket name is not a string or None.")
+            raise ValueError("Bucket name is not a string.")
 
-        self.__bucket_name = name
-
-        if self.parquet_file is not None:
-            self.__update_parquet_url()
+        self.__bucket = name
 
     @property
     def parquet_file(self) -> str:
@@ -91,37 +92,34 @@ class ArticleToParquetS3:
     @parquet_file.setter
     def parquet_file(self, filename: str):
         if type(filename) != str:
-            raise ValueError("Parquet filepath is not a string.")
+            raise ValueError("S3 Parquet file is not a string.")
 
         self.__parquet_file = filename
 
-        if self.bucket_name is not None:
-            self.__update_parquet_url()
-
     @property
-    def batch_size(self) -> Optional[int]:
-        """`int`: The number of articles to upload to Amazon S3 in a batch
+    def local_parquet_dir(self) -> str:
+        return self.__local_parquet_dir
+
+    @local_parquet_dir.setter
+    def local_parquet_dir(self, path: str):
+        if type(path) != str:
+            raise ValueError("Path is not a string.")
         
-        The setter will raise a ValueError if the new batch size is not an
-        integer greater than zero.
-        """
-        return self.__batch_size
-
-    @batch_size.setter
-    def batch_size(self, size: Optional[int]):
-        if size is not None and (type(size) != int or size <= 0):
-            raise ValueError("Size is not an integer greater than zero.")
-
-        self.__batch_size = size
+        if not os.path.exists(path):
+            logging.info(f"Making new local parquet directory '{path}'.")
+            os.mkdir(path)
+        
+        self.__local_parquet_dir = path
 
     @property
     def parquet_url(self) -> str:
         """`str`: The Amazon S3 URL to the parquet file to push to."""
-        return self.__parquet_url
+        return f"s3a://{self.bucket}/{self.parquet_file}"
 
-    def __update_parquet_url(self):
-        """Update the parquet URL with a new bucket or parquet file name."""
-        self.__parquet_url = f"s3a://{self.bucket_name}/{self.parquet_file}"
+    @property
+    def local_parquet_file(self) -> str:
+        """`str`: The path to save temporary parquet files to locally."""
+        return os.path.join(self.local_parquet_dir, self.parquet_file)
 
     @property
     def partitions(self) -> Tuple[str]:
@@ -144,23 +142,39 @@ class ArticleToParquetS3:
         self.__partitions = keys
 
     @property
-    def report_every(self) -> int:
-        """`int`: The number of articles to extract per counter report.
+    def batch_size(self) -> Optional[int]:
+        """`int`: The number of articles to download to disk in batches.
+        
+        The setter will raise a ValueError if the new batch size is not an
+        integer greater than zero.
+        """
+        return self.__batch_size
+
+    @batch_size.setter
+    def batch_size(self, size: Optional[int]):
+        if size is not None and (type(size) != int or size <= 0):
+            raise ValueError("Size is not an integer greater than zero.")
+
+        self.__batch_size = size
+
+    @property
+    def report_every(self) -> Optional[int]:
+        """`int`: The number of articles processed per counter report.
         
         Setter will raise a ValueError if the new value is not an integer
         greater than zero.
         """
         return self.__report_every
 
-    def report_every(self, n: int):
-        if type(n) != int or n <= 0:
+    def report_every(self, n: Optional[int]):
+        if n is not None and (type(n) != int or n <= 0):
             raise ValueError("Value must be an integer greater than zero.")
 
         self.__report_every = n
 
     def report_counters(self):
         """Report the extracted/discarded/errored/total counters."""
-        message = "Counters report:"
+        message = "CounterReport:"
         for name, counter in self.extractor.counters.items():
             message += f" {name}={counter}"
 
@@ -181,7 +195,7 @@ class ArticleToParquetS3:
     def add_article(self, article: Article, date_crawled: datetime,
                     counters: Dict[str, int]):
         try:
-            date_published = article.publish_date.date().isoformat()
+            date_published = article.publish_date.strftime("%Y-%m-%d")
         except (ValueError, AttributeError):
             date_published = None
 
@@ -192,24 +206,24 @@ class ArticleToParquetS3:
                 ("url", article.url),
                 ("source_domain", article.source_url),
                 ("date_publish", date_published),
-                ("date_crawled", date_crawled.date().isoformat()),
+                ("date_crawled", date_crawled.strftime("%Y-%m-%d")),
                 ("language", article.config.get_language())
             ])
         )
 
-        if counters["extracted"] % self.report_every == 0:
-            self.report_counters()
-
-        # Run batch upload
         if self.batch_size is not None \
             and counters["extracted"] % self.batch_size == 0:
 
-            self.upload_to_parquet()
-            self.articles = list()
+            self.save_parquet_locally()
 
-    def upload_to_parquet(self):
+        if self.report_every is not None \
+            and counters["extracted"] % self.report_every == 0:
+            
+            self.report_counters()
+
+    def save_parquet_locally(self):
         if not self.articles:
-            logging.info("No articles available to push to S3.")
+            logging.info("No articles available to save.")
             return
 
         rows = self.context \
@@ -217,9 +231,23 @@ class ArticleToParquetS3:
             .map(self.__dict_to_row)
 
         articles_df = self.spark.createDataFrame(rows, self.schema)
+        
+        logging.info(f"Saving parque to '{self.local_parquet_file}'")
+
+        articles_df.repartition(*self.partitions) \
+            .write.mode('append') \
+            .partitionBy(*self.partitions) \
+            .parquet(self.local_parquet_file)
+        
+        self.articles = list()
+
+    def upload_parquet_to_s3(self):
+        articles_df = self.spark.read.parquet(self.local_parquet_file)
 
         logging.info(f"Pushing to '{self.parquet_url}'")
-        articles_df.write.mode('append') \
+
+        articles_df.repartition(*self.partitions) \
+            .write.mode('append') \
             .partitionBy(*self.partitions) \
             .parquet(self.parquet_url)
 
@@ -227,7 +255,7 @@ class ArticleToParquetS3:
             end_date: datetime):
 
         self.extractor.download_articles(patterns, start_date, end_date)
-
-        # Uploaded any remaining articles (e.g. if using a large batch size)
-        self.upload_to_parquet()
-        self.articles = list()
+        
+        # Download any remaining articles and bulk upload to S3
+        self.save_parquet_locally()
+        self.upload_parquet_to_s3()
