@@ -66,6 +66,7 @@ class ArticleToParquetS3:
             types.StructField('language', types.StringType(), False)
         ])
 
+        self.article_df = self.spark.createDataFrame([], self.schema)
         self.articles = list()
 
     @property
@@ -162,17 +163,16 @@ class ArticleToParquetS3:
         except (ValueError, AttributeError):
             date_published = None
 
-        self.articles.append(
-            Row(
-                title=article.title,
-                main_text=article.text,
-                url=article.url,
-                source_domain=article.source_url,
-                date_publish=date_published,
-                date_crawled=date_crawled.strftime("%Y-%m-%d"),
-                language=article.config.get_language()
-            )
-        )
+        row = Row(title=article.title,
+                  main_text=article.text,
+                  url=article.url,
+                  source_domain=article.source_url,
+                  date_publish=date_published,
+                  date_crawled=date_crawled.strftime("%Y-%m-%d"),
+                  language=article.config.get_language())
+
+        row_df = self.spark.createDataFrame([row], self.schema)
+        self.article_df = self.article_df.union(row_df)
 
         counters = self.extractor.counters
 
@@ -187,17 +187,10 @@ class ArticleToParquetS3:
             self.report_counters()
 
     def upload_parquet_to_s3(self):
-        if not self.articles:
-            logging.info("No articles available to upload.")
-            return
-
-        rows = self.context.parallelize(self.articles)
-        df = self.spark.createDataFrame(rows, self.schema)
-
         logging.info(f"Pushing to '{self.parquet_url}'")
 
-        df.repartition(*self.partitions) \
-            .write.mode('append') \
+        self.article_df.repartition(*self.partitions) \
+            .write.mode('overwrite') \
             .partitionBy(*self.partitions) \
             .parquet(self.parquet_url)
 
