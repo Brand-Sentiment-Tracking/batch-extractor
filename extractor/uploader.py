@@ -1,8 +1,6 @@
-import os
 import logging
 
-from collections import OrderedDict
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from datetime import datetime
 
@@ -34,7 +32,6 @@ class ArticleToParquetS3:
             "date_crawled", "language")
 
     def __init__(self, bucket: str, parquet_file: str,
-                 local_parquet_dir: str = "./parquet",
                  partitions: Optional[Tuple[str]] = None,
                  batch_size: Optional[int] = 1000,
                  report_every: Optional[int] = 1000):
@@ -43,9 +40,7 @@ class ArticleToParquetS3:
         self.__parquet_file = None
 
         self.bucket = bucket
-
         self.parquet_file = parquet_file
-        self.local_parquet_dir = local_parquet_dir
 
         self.partitions = partitions if partitions is not None \
             else ("date_crawled", "language")
@@ -97,29 +92,9 @@ class ArticleToParquetS3:
         self.__parquet_file = filename
 
     @property
-    def local_parquet_dir(self) -> str:
-        return self.__local_parquet_dir
-
-    @local_parquet_dir.setter
-    def local_parquet_dir(self, path: str):
-        if type(path) != str:
-            raise ValueError("Path is not a string.")
-        
-        if not os.path.exists(path):
-            logging.info(f"Making new local parquet directory '{path}'.")
-            os.mkdir(path)
-        
-        self.__local_parquet_dir = path
-
-    @property
     def parquet_url(self) -> str:
         """`str`: The Amazon S3 URL to the parquet file to push to."""
         return f"s3a://{self.bucket}/{self.parquet_file}"
-
-    @property
-    def local_parquet_file(self) -> str:
-        """`str`: The path to save temporary parquet files to locally."""
-        return os.path.join(self.local_parquet_dir, self.parquet_file)
 
     @property
     def partitions(self) -> Tuple[str]:
@@ -181,18 +156,6 @@ class ArticleToParquetS3:
 
         logging.info(message)
 
-    @staticmethod
-    def __dict_to_row(article: OrderedDict) -> Row:
-        """Convert an article as an `OrderedDict` into a Spark `Row` object.
-
-        Args:
-            article (OrderedDict): The article to convert to a Row object.
-
-        Returns:
-            Row: The converted article.
-        """
-        return Row(**article)
-
     def add_article(self, article: Article, date_crawled: datetime):
         try:
             date_published = article.publish_date.strftime("%Y-%m-%d")
@@ -200,15 +163,15 @@ class ArticleToParquetS3:
             date_published = None
 
         self.articles.append(
-            OrderedDict([
-                ("title", article.title),
-                ("main_text", article.text),
-                ("url", article.url),
-                ("source_domain", article.source_url),
-                ("date_publish", date_published),
-                ("date_crawled", date_crawled.strftime("%Y-%m-%d")),
-                ("language", article.config.get_language())
-            ])
+            Row(
+                title=article.title,
+                main_text=article.text,
+                url=article.url,
+                source_domain=article.source_url,
+                date_publish=date_published,
+                date_crawled=date_crawled.strftime("%Y-%m-%d"),
+                language=article.config.get_language()
+            )
         )
 
         counters = self.extractor.counters
@@ -216,48 +179,35 @@ class ArticleToParquetS3:
         if self.batch_size is not None \
             and counters["extracted"] % self.batch_size == 0:
 
-            self.save_parquet_locally()
+            self.upload_parquet_to_s3()
 
         if self.report_every is not None \
             and counters["extracted"] % self.report_every == 0:
             
             self.report_counters()
 
-    def save_parquet_locally(self):
+    def upload_parquet_to_s3(self):
         if not self.articles:
-            logging.info("No articles available to save.")
+            logging.info("No articles available to upload.")
             return
 
-        rows = self.context \
-            .parallelize(self.articles) \
-            .map(self.__dict_to_row)
-
-        articles_df = self.spark.createDataFrame(rows, self.schema)
-        
-        logging.info(f"Saving parque to '{self.local_parquet_file}'")
-
-        articles_df.repartition(*self.partitions) \
-            .write.mode('append') \
-            .partitionBy(*self.partitions) \
-            .parquet(self.local_parquet_file)
-        
-        self.articles = list()
-
-    def upload_parquet_to_s3(self):
-        articles_df = self.spark.read.parquet(self.local_parquet_file)
+        rows = self.context.parallelize(self.articles)
+        df = self.spark.createDataFrame(rows, self.schema)
 
         logging.info(f"Pushing to '{self.parquet_url}'")
 
-        articles_df.repartition(*self.partitions) \
+        df.repartition(*self.partitions) \
             .write.mode('append') \
             .partitionBy(*self.partitions) \
             .parquet(self.parquet_url)
+
+        logging.info("Push successful.")
+
+        self.articles = list()
 
     def run(self, patterns: List[str], start_date: datetime,
             end_date: datetime):
 
         self.extractor.download_articles(patterns, start_date, end_date)
-        
-        # Download any remaining articles and bulk upload to S3
-        self.save_parquet_locally()
+        # Upload any remaining articles to S3
         self.upload_parquet_to_s3()

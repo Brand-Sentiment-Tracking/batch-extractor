@@ -59,4 +59,7 @@ RUN . ./bin/activate && \
 COPY extractor/ extractor/
 COPY main.py .
 
+# Copy spark log4j config so only warnings are displayed
+COPY log4j.properties /opt/spark/conf/log4j.properties
+
 ENTRYPOINT . ./bin/activate && spark-submit main.py

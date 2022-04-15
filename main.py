@@ -11,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 bucket_name = environ.get("S3_BUCKET_NAME")
 parquet_file = environ.get("PARQUET_FILE")
 batch_size = environ.get("BATCH_SIZE")
+report_every = environ.get("REPORT_EVERY")
 
 url_patterns = environ.get("URL_PATTERNS")
 start_date = environ.get("START_DATE")
@@ -18,6 +19,10 @@ end_date = environ.get("END_DATE")
 
 batch_size = int(batch_size) \
     if batch_size is not None \
+        else None
+
+report_every = int(report_every) \
+    if report_every is not None \
         else None
 
 url_patterns = json.loads(url_patterns) \
@@ -34,7 +39,8 @@ else:
 
 
 uploader = ArticleToParquetS3(bucket_name, parquet_file,
-                              batch_size=batch_size)
+                              batch_size=batch_size,
+                              report_every=report_every)
 
 logging.info(f"Downloading articles crawled between "
              f"{start_date.date()} and {end_date.date()}.")

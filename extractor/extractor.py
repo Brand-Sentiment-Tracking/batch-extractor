@@ -51,6 +51,7 @@ class ArticleExtractor:
 
         self.__start_date = None
         self.__end_date = None
+        self.__stopping = False
 
         self.reset_counters()
 
@@ -171,6 +172,16 @@ class ArticleExtractor:
         self.__extracted = 0
         self.__discarded = 0
         self.__errored = 0
+
+    @property
+    def stopping(self) -> bool:
+        return self.__stopping
+
+    def stop(self):
+        self.__stopping = True
+
+    def reset_stop(self):
+        self.__stopping = False
 
     def __load_warc_paths(self, month: int, year: int) -> List[str]:
         """Returns a list of warc files for a single month/year archive.
@@ -372,6 +383,9 @@ class ArticleExtractor:
 
             self.extract_article(url, html, language, date_crawled)
 
+            if self.stopping:
+                break
+
     def __load_warc(self, warc_path: str):
         """Downloads and parses a warc file for article extraction.
 
@@ -418,3 +432,7 @@ class ArticleExtractor:
 
         for warc in warc_paths:
             self.__load_warc(warc)
+
+            if self.stopping:
+                self.reset_stop()
+                break
