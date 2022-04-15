@@ -193,8 +193,7 @@ class ArticleToParquetS3:
         """
         return Row(**article)
 
-    def add_article(self, article: Article, date_crawled: datetime,
-                    counters: Dict[str, int]):
+    def add_article(self, article: Article, date_crawled: datetime):
         try:
             date_published = article.publish_date.strftime("%Y-%m-%d")
         except (ValueError, AttributeError):
@@ -211,6 +210,8 @@ class ArticleToParquetS3:
                 ("language", article.config.get_language())
             ])
         )
+
+        counters = self.extractor.counters
 
         if self.batch_size is not None \
             and counters["extracted"] % self.batch_size == 0:

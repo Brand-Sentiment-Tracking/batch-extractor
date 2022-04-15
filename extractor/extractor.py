@@ -39,7 +39,7 @@ class ArticleExtractor:
 
     SUPPORTED_LANGUAGES = get_available_languages()
 
-    ArticleCallback = Callable[[Article, datetime, Dict[str, int]], None]
+    ArticleCallback = Callable[[Article, datetime], None]
 
     def __init__(self, article_callback: Optional[ArticleCallback] = None):
         # Set article_callback to the empty callback if no function is passed
@@ -74,8 +74,7 @@ class ArticleExtractor:
 
         self.__article_callback = func
 
-    def __empty_callback(article: Article, date_crawled: datetime,
-                         counters: Dict[str, int]):
+    def __empty_callback(article: Article, date_crawled: datetime):
         """Default function when an article_callback isn't specified.
 
         Note:
@@ -342,7 +341,7 @@ class ArticleExtractor:
 
         # Conditional here so exceptions in the callback are still raised
         if article.is_parsed:
-            self.article_callback(article, date_crawled, self.counters)
+            self.article_callback(article, date_crawled)
 
     def __parse_records(self, warc: HTTPResponse, date_crawled: datetime):
         """Iterate through articles from a warc file.
