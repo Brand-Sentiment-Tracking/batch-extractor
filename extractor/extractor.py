@@ -41,7 +41,9 @@ class ArticleExtractor:
 
     ArticleCallback = Callable[[Article, datetime], None]
 
-    def __init__(self, article_callback: Optional[ArticleCallback] = None):
+    def __init__(self, article_callback: Optional[ArticleCallback] = None,
+                 log_level: int = logging.INFO):
+
         # Set article_callback to the empty callback if no function is passed
         self.article_callback = article_callback \
             if article_callback is not None \
@@ -54,6 +56,9 @@ class ArticleExtractor:
         self.__stopping = False
 
         self.reset_counters()
+
+        self.logger = logging.getLogger("ArticleExtractor")
+        self.logger.setLevel(log_level)
 
     @property
     def article_callback(self) -> ArticleCallback:
@@ -178,6 +183,10 @@ class ArticleExtractor:
         return self.__stopping
 
     def stop(self):
+        if self.stopping:
+            return
+        
+        self.logger.info("Stopping extraction.")
         self.__stopping = True
 
     def reset_stop(self):
@@ -209,7 +218,7 @@ class ArticleExtractor:
             content = gzip.decompress(response.content)
             filenames = content.decode("utf-8").splitlines()
         else:
-            logging.warn(f"Failed to download paths from '{paths_url}' "
+            self.logger.warn(f"Failed to download paths from '{paths_url}' "
                          f"(status code {response.status_code}).")
 
             filenames = list()
@@ -220,7 +229,7 @@ class ArticleExtractor:
         match = self.WARC_FILE_RE.search(warc_filepath)
 
         if match is None:
-            logging.debug(f"Ignoring '{warc_filepath}'.")
+            self.logger.debug(f"Ignoring '{warc_filepath}'.")
             return False
 
         time = match.group("time")
@@ -282,7 +291,7 @@ class ArticleExtractor:
         filenames = list()
 
         for d in rrule(MONTHLY, self.start_date, until=self.end_date):
-            logging.info(f"Downloading warc paths for {d.strftime('%b %Y')}.")
+            self.logger.info(f"Getting warc paths for {d.strftime('%b %Y')}.")
             filenames.extend(self.__load_warc_paths(d.month, d.year))
 
         return self.__filter_warc_paths(filenames)
@@ -335,7 +344,7 @@ class ArticleExtractor:
             language (str): The two-char language code of the record.
         """
         if language not in self.SUPPORTED_LANGUAGES:
-            logging.debug(f"Language not supported for '{url}'")
+            self.logger.debug(f"Language not supported for '{url}'")
             self.__discarded += 1
             return
 
@@ -347,7 +356,7 @@ class ArticleExtractor:
             self.__extracted += 1
         # Blanket error catch here. Should be made more specific
         except Exception as e:
-            logging.warn(str(e))
+            self.logger.warning(str(e))
             self.__errored += 1
 
         # Conditional here so exceptions in the callback are still raised
@@ -369,7 +378,7 @@ class ArticleExtractor:
             url = record.rec_headers.get_header("WARC-Target-URI")
 
             if not self.__is_valid_record(record):
-                logging.debug(f"Ignoring '{url}'")
+                self.logger.debug(f"Ignoring '{url}'")
                 self.__discarded += 1
                 continue
 
@@ -377,7 +386,7 @@ class ArticleExtractor:
                 html = record.content_stream().read().decode("utf-8")
                 language = langdetect.detect(html)
             except Exception:
-                logging.debug(f"Couldn't decode '{url}'")
+                self.logger.debug(f"Couldn't decode '{url}'")
                 self.__errored += 1
                 continue
 
@@ -400,13 +409,13 @@ class ArticleExtractor:
         warc_url = urljoin(self.CC_DOMAIN, warc_path)
         date_crawled = self.__extract_date(warc_path)
 
-        logging.info(f"Downloading '{warc_url}'")
+        self.logger.info(f"Downloading '{warc_url}'")
         response = requests.get(warc_url, stream=True)
 
         if response.ok:
             self.__parse_records(response.raw, date_crawled)
         else:
-            logging.warn(f"Failed to download warc from '{warc_url}' "
+            self.logger.warn(f"Failed to download warc from '{warc_url}' "
                          f"(status code {response.status_code}).")
 
     def download_articles(self, patterns: List[str], start_date: datetime,

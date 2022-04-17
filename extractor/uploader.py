@@ -34,7 +34,8 @@ class ArticleToParquetS3:
     def __init__(self, bucket: str, parquet_file: str,
                  partitions: Optional[Tuple[str]] = None,
                  batch_size: Optional[int] = 1000,
-                 report_every: Optional[int] = 1000):
+                 report_every: Optional[int] = 1000,
+                 log_level: int = logging.INFO):
 
         self.__bucket = None
         self.__parquet_file = None
@@ -48,7 +49,7 @@ class ArticleToParquetS3:
         self.batch_size = batch_size
         self.report_every = report_every
 
-        self.extractor = ArticleExtractor(self.add_article)
+        self.extractor = ArticleExtractor(self.add_article, log_level)
 
         self.spark = SparkSession.builder \
             .appName("ArticleToParquet") \
@@ -67,6 +68,9 @@ class ArticleToParquetS3:
         ])
 
         self.articles = list()
+
+        self.logger = logging.getLogger("ArticleToParquetS3")
+        self.logger.setLevel(log_level)
 
     @property
     def bucket(self) -> str:
@@ -149,12 +153,12 @@ class ArticleToParquetS3:
 
     def report_counters(self):
         """Report the extracted/discarded/errored/total counters."""
-        message = "(Counters Report)"
+        message = "Counter Update"
         
         for name, counter in self.extractor.counters.items():
             message += f" {name}={counter}"
 
-        logging.info(message)
+        self.logger.info(message)
 
     def add_article(self, article: Article, date_crawled: datetime):
         try:
@@ -188,20 +192,20 @@ class ArticleToParquetS3:
 
     def upload_parquet_to_s3(self):
         if not self.articles:
-            logging.info("No articles available to upload.")
+            self.logger.info("No articles available to upload.")
             return
 
         rows = self.context.parallelize(self.articles)
         df = self.spark.createDataFrame(rows, self.schema)
 
-        logging.info(f"Pushing to '{self.parquet_url}'")
+        self.logger.info(f"Pushing to '{self.parquet_url}'")
 
         df.repartition(*self.partitions) \
             .write.mode('append') \
             .partitionBy(*self.partitions) \
             .parquet(self.parquet_url)
 
-        logging.info("Push successful.")
+        self.logger.info("Push successful.")
 
         self.articles = list()
 
