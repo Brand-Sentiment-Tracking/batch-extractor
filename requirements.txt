@@ -3,3 +3,5 @@ pyspark
 warcio
 langdetect
 newspaper3k
+pandas
+pyarrow

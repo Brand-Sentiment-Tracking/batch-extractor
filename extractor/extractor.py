@@ -1,26 +1,18 @@
+import os
 import re
 import gzip
 import requests
 import logging
-import langdetect
+import multiprocessing
 
-import os.path
-
-from typing import Callable, List, Dict, Optional
+from typing import List, Dict, Tuple
 
 from datetime import datetime
 from dateutil.rrule import rrule, MONTHLY
 
-from fnmatch import fnmatch
-
-from urllib3.response import HTTPResponse
 from urllib.parse import urljoin
 
-from warcio.archiveiterator import ArchiveIterator
-from warcio.recordloader import ArcWarcRecord
-
-from newspaper import Article
-from newspaper.utils import get_available_languages
+from .job import ExtractionJob
 
 
 class ArticleExtractor:
@@ -35,80 +27,57 @@ class ArticleExtractor:
     CC_NEWS_ROUTE = os.path.join("crawl-data", "CC-NEWS")
 
     WARC_FILE_RE = re.compile(r"CC-NEWS-(?P<time>\d{14})-(?P<serial>\d{5})")
-    CONTENT_RE = re.compile(r"^(?P<mime>[\w\/]+);\s?charset=(?P<charset>.*)$")
 
-    SUPPORTED_LANGUAGES = get_available_languages()
+    def __init__(self, log_level: int = logging.INFO,
+                 parquet_dir: str = "./parquets",
+                 cores: int = None):
 
-    ArticleCallback = Callable[[Article, datetime], None]
+        self.log_level = log_level
 
-    def __init__(self, article_callback: Optional[ArticleCallback] = None,
-                 log_level: int = logging.INFO):
+        self.logger = logging.getLogger("ArticleExtractor")
+        self.logger.setLevel(self.log_level)
 
-        # Set article_callback to the empty callback if no function is passed
-        self.article_callback = article_callback \
-            if article_callback is not None \
-            else self.__empty_callback
+        self.parquet_dir = parquet_dir
 
-        self.patterns = list()
+        self.cores = cores if cores is not None \
+            else os.cpu_count()
 
         self.__start_date = None
         self.__end_date = None
-        self.__stopping = False
 
         self.reset_counters()
 
-        self.logger = logging.getLogger("ArticleExtractor")
-        self.logger.setLevel(log_level)
+        self.parquet_files = list()
 
     @property
-    def article_callback(self) -> ArticleCallback:
-        """`callable`: Called once an article has been extracted.
+    def parquet_dir(self):
+        return self.__parquet_dir
 
-        Note:
-            The callback is passed one argument: the article as a
-                `newspaper.Article` object.
-
-        The setter method will throw a ValueError if the new callback is not
-        a function.
-        """
-        return self.__article_callback
-
-    @article_callback.setter
-    def article_callback(self, func: ArticleCallback):
-        if not callable(func):
-            raise ValueError("Article callback is not a function.")
-
-        self.__article_callback = func
-
-    def __empty_callback(article: Article, date_crawled: datetime):
-        """Default function when an article_callback isn't specified.
-
-        Note:
-            This function does nothing.
-
-        Args:
-            article (Article): The extracted article.
-        """
-        return
+    @parquet_dir.setter
+    def parquet_dir(self, path):
+        if type(path) != str:
+            raise ValueError("Path is not a string.")
+        elif not os.path.exists(path):
+            self.logger.debug(f"Creating directory '{path}'.")
+            os.makedirs(path, exist_ok=True)
+        elif not os.path.isdir(path):
+            raise ValueError(f"'{path}' is not a directory.")
+        
+        self.__parquet_dir = path
 
     @property
-    def patterns(self) -> List[str]:
-        """`list` of `str` containing the url patterns to match the
-        article URL against when filtering.
+    def cores(self):
+        return self.__cores
 
-        The setter method will throw a ValueError if the new patterns is not a
-        list of strings.
-        """
-        return self.__patterns
-
-    @patterns.setter
-    def patterns(self, patterns: List[str]):
-        if type(patterns) != list:
-            raise ValueError("URL patterns is not a list.")
-        elif any(map(lambda x: type(x) != str, patterns)):
-            raise ValueError("Not all URL patterns are strings.")
-
-        self.__patterns = patterns
+    @cores.setter
+    def cores(self, cores):
+        if type(cores) != int:
+            raise ValueError("Cores is not an integer.")
+        elif cores > os.cpu_count():
+            raise ValueError(f"{cores} cores is greater than the "
+                             "number of CPU cores available.")
+        
+        self.__cores = cores
 
     @property
     def start_date(self) -> datetime:
@@ -172,25 +141,25 @@ class ArticleExtractor:
             "total": total
         }
 
+    def __update_counters(self, counters):
+        self.__extracted += counters.get("extracted")
+        self.__discarded += counters.get("discarded")
+        self.__errored += counters.get("errored")
+
     def reset_counters(self):
         """Reset the counters for extracted/discarded/errored to zero."""
         self.__extracted = 0
         self.__discarded = 0
         self.__errored = 0
 
-    @property
-    def stopping(self) -> bool:
-        return self.__stopping
-
-    def stop(self):
-        if self.stopping:
-            return
+    def report_counters(self):
+        """Report the extracted/discarded/errored/total counters."""
+        message = "Counter Update"
         
-        self.logger.info("Stopping extraction.")
-        self.__stopping = True
+        for name, counter in self.counters.items():
+            message += f" {name}={counter}"
 
-    def reset_stop(self):
-        self.__stopping = False
+        self.logger.info(message)
 
     def __load_warc_paths(self, month: int, year: int) -> List[str]:
         """Returns a list of warc files for a single month/year archive.
@@ -277,7 +246,8 @@ class ArticleExtractor:
         """
         return list(filter(self.__is_within_date, filepaths))
 
-    def __retrieve_warc_paths(self) -> List[str]:
+    def retrieve_warc_paths(self, start_date: datetime,
+                            end_date: datetime) -> List[str]:
         """Returns a list of warc filepaths from CC-NEWS that were crawled
         between the start and end dates.
 
@@ -288,6 +258,9 @@ class ArticleExtractor:
         Returns:
             List[str]: A list of warc filepaths.
         """
+        self.end_date = end_date
+        self.start_date = start_date
+
         filenames = list()
 
         for d in rrule(MONTHLY, self.start_date, until=self.end_date):
@@ -296,130 +269,42 @@ class ArticleExtractor:
 
         return self.__filter_warc_paths(filenames)
 
-    def __is_valid_record(self, record: ArcWarcRecord) -> bool:
-        """Checks whether a warc record should be extracted to an article.
+    def __on_job_success(self, result: Tuple[List[str], Dict[str, int]]):
+        parquet_path, counters = result
+        
+        self.__update_counters(counters)
+        self.report_counters()
 
-        This is done by checking:
-        - The record type is a response.
-        - Its MIME type is `text/html` and its charset is UTF-8.
-        - The source URL matches one of the url patterns.
+        self.parquet_files.append(parquet_path)
 
-        Args:
-            record (ArcWarcRecord): The record to evaluate.
+    def __on_job_error(self, error: Exception):
+        self.logger.error(f"Process exited with error:\n\t{str(error)}")
 
-        Returns:
-            bool: True if the record is valid and should be extracted to an
-                article. False otherwise.
-        """
-        if record.rec_type != "response":
-            return False
+    @staticmethod
+    def run_extraction_job(warc_path: str, patterns: List[str], 
+                           date_crawled: datetime, parquet_dir: str,
+                           log_level: int) -> Tuple[str, Dict[str, int]]:
 
-        source_url = record.rec_headers.get_header("WARC-Target-URI")
-        content_string = record.http_headers.get_header('Content-Type')
+        job = ExtractionJob(warc_path, patterns, date_crawled, 
+                            parquet_dir, log_level)
 
-        if source_url is None or content_string is None:
-            return False
+        job.extract_warc()
 
-        content = self.CONTENT_RE.match(content_string)
+        return job.filename, job.counters
 
-        if content is None or content.group("mime") != "text/html" \
-                or content.group("charset").lower() != "utf-8":
-
-            return False
-
-        return any(map(lambda url: fnmatch(source_url, url), self.patterns))
-
-    def extract_article(self, url: str, html: str, language: str,
-                        date_crawled: datetime):
-        """Extracts the article from its html and update counters.
-
-        Once successfully extracted, it is then passed to `article_callback`.
-
-        Note:
-            If the extraction process fails, the article will be discarded.
-
-        Args:
-            url (str): The source URL of the article.
-            html (str): The complete HTML structure of the record.
-            language (str): The two-char language code of the record.
-        """
-        if language not in self.SUPPORTED_LANGUAGES:
-            self.logger.debug(f"Language not supported for '{url}'")
-            self.__discarded += 1
-            return
-
-        article = Article(url, language=language)
-
-        try:
-            article.download(input_html=html)
-            article.parse()
-            self.__extracted += 1
-        # Blanket error catch here. Should be made more specific
-        except Exception as e:
-            self.logger.warning(str(e))
-            self.__errored += 1
-
-        # Conditional here so exceptions in the callback are still raised
-        if article.is_parsed:
-            self.article_callback(article, date_crawled)
-
-    def __parse_records(self, warc: HTTPResponse, date_crawled: datetime):
-        """Iterate through articles from a warc file.
-
-        Each record is loaded using warcio, and extracted if:
-        - It is a valid news article (see __is_valid_record)
-        - Its source URL matches one of the patterns.
-        - The detected language is supported by newspaper.
-
-        Args:
-            warc (HTTPResponse): The complete warc file as a stream.
-        """
-        for record in ArchiveIterator(warc, arc2warc=True):
-            url = record.rec_headers.get_header("WARC-Target-URI")
-
-            if not self.__is_valid_record(record):
-                self.logger.debug(f"Ignoring '{url}'")
-                self.__discarded += 1
-                continue
-
-            try:
-                html = record.content_stream().read().decode("utf-8")
-                language = langdetect.detect(html)
-            except Exception:
-                self.logger.debug(f"Couldn't decode '{url}'")
-                self.__errored += 1
-                continue
-
-            self.extract_article(url, html, language, date_crawled)
-
-            if self.stopping:
-                break
-
-    def __load_warc(self, warc_path: str):
-        """Downloads and parses a warc file for article extraction.
-
-        Note:
-            If the response returns a bad status code, the method will exit
-            without parsing the warc file.
-
-        Args:
-            warc_path (str): The route of the warc file to be downloaded (not
-                including the CommonCrawl domain).
-        """
+    def __submit_job(self, pool, warc_path, patterns):
         warc_url = urljoin(self.CC_DOMAIN, warc_path)
         date_crawled = self.__extract_date(warc_path)
 
-        self.logger.info(f"Downloading '{warc_url}'")
-        response = requests.get(warc_url, stream=True)
+        args = (warc_url, patterns, date_crawled,
+                self.parquet_dir, self.log_level)
 
-        if response.ok:
-            self.__parse_records(response.raw, date_crawled)
-        else:
-            self.logger.warn(f"Failed to download warc from '{warc_url}' "
-                         f"(status code {response.status_code}).")
+        pool.apply_async(self.run_extraction_job, args,
+                         callback=self.__on_job_success,
+                         error_callback=self.__on_job_error)
 
     def download_articles(self, patterns: List[str], start_date: datetime,
-                          end_date: datetime):
+                          end_date: datetime) -> List[str]:
         """Downloads and extracts articles from CC-NEWS.
 
         Articles are extracted only if:
@@ -433,15 +318,13 @@ class ArticleExtractor:
             end_date (datetime): The latest date the article must have been
                 crawled by.
         """
-        self.patterns = patterns
-        self.end_date = end_date
-        self.start_date = start_date
-
-        warc_paths = self.__retrieve_warc_paths()
+        warc_paths = self.retrieve_warc_paths(start_date, end_date)
+        pool = multiprocessing.Pool(processes=self.cores)
 
         for warc in warc_paths:
-            self.__load_warc(warc)
-
-            if self.stopping:
-                self.reset_stop()
-                break
+            self.__submit_job(pool, warc, patterns)
+        
+        pool.close()
+        pool.join()
+        
+        return self.parquet_files
