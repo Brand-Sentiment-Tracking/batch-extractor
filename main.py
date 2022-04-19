@@ -15,6 +15,8 @@ url_patterns = environ.get("URL_PATTERNS")
 start_date = environ.get("START_DATE")
 end_date = environ.get("END_DATE")
 
+max_records = int(max_records)
+
 url_patterns = json.loads(url_patterns) \
     if url_patterns is not None \
         else ["*"]

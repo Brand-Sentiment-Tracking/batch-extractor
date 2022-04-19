@@ -31,7 +31,7 @@ class ArticleToParquetS3:
     FIELDS = ("title", "main_text", "url", "source_domain", 
              "date_publish", "date_crawled", "language")
 
-    def __init__(self, bucket: str, max_records: int = 1000,
+    def __init__(self, bucket: str, max_records: int = None,
                  partitions: Optional[Tuple[str]] = None,
                  log_level: int = logging.INFO,
                  parquet_dir: str = "./parquets",
@@ -42,6 +42,7 @@ class ArticleToParquetS3:
 
         self.bucket = bucket
         self.parquet_dir = parquet_dir
+
         self.max_records = max_records
 
         self.partitions = partitions if partitions is not None \
@@ -87,6 +88,19 @@ class ArticleToParquetS3:
     def parquet_url(self) -> str:
         """`str`: The Amazon S3 URL to the parquet file to push to."""
         return f"s3a://{self.bucket}/"
+
+    @property
+    def max_records(self) -> int:
+        return self.__max_records
+
+    @max_records.setter
+    def max_records(self, n: int):
+        if type(n) != int:
+            raise ValueError("Max records is not an integer.")
+        elif n <= 0:
+            raise ValueError("Max records must be greater than 0.")
+        
+        self.__max_records = n
 
     @property
     def partitions(self) -> Tuple[str]:

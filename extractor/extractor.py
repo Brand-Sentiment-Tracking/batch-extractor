@@ -5,14 +5,14 @@ import requests
 import logging
 import multiprocessing
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Optional, Tuple
 
 from datetime import datetime
 from dateutil.rrule import rrule, MONTHLY
 
 from urllib.parse import urljoin
 
-from .job import ExtractionJob
+from .extraction_job import ExtractionJob
 
 
 class ArticleExtractor:
@@ -30,7 +30,7 @@ class ArticleExtractor:
 
     def __init__(self, log_level: int = logging.INFO,
                  parquet_dir: str = "./parquets",
-                 cores: int = None):
+                 cores: Optional[int] = None):
 
         self.log_level = log_level
 
@@ -38,9 +38,7 @@ class ArticleExtractor:
         self.logger.setLevel(self.log_level)
 
         self.parquet_dir = parquet_dir
-
-        self.cores = cores if cores is not None \
-            else os.cpu_count()
+        self.cores = cores
 
         self.__start_date = None
         self.__end_date = None
@@ -71,6 +69,11 @@ class ArticleExtractor:
 
     @cores.setter
     def cores(self, cores):
+        if cores is None:
+            self.__cores = os.cpu_count()
+            logging.info(f"Setting cores to {self.cores}.")
+            return
+
         if type(cores) != int:
             raise ValueError("Cores is not an integer.")
         elif cores > os.cpu_count():
