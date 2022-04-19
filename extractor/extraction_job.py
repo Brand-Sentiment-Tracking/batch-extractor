@@ -25,8 +25,8 @@ class ExtractionJob:
     CONTENT_RE = re.compile(r"^(?P<mime>[\w\/]+);\s?charset=(?P<charset>.*)$")
     SUPPORTED_LANGUAGES = get_available_languages()
 
-    FIELDS = ("title", "main_text", "url", "source_domain", 
-             "date_publish", "date_crawled", "language")
+    FIELDS = ("title", "main_text", "url", "source_domain",
+              "date_publish", "date_crawled", "language")
 
     def __init__(self, warc_url: str, patterns: List[str],
                  date_crawled: datetime, warc_dir: str = "./parquets",
@@ -176,7 +176,7 @@ class ExtractionJob:
             article.download(input_html=html)
             article.parse()
             self.__extracted += 1
-        
+
         # Blanket error catch here. Should be made more specific.
         except Exception as e:
             self.logger.warning(str(e))
@@ -196,11 +196,7 @@ class ExtractionJob:
         Args:
             warc (HTTPResponse): The complete warc file as a stream.
         """
-        for i, record in enumerate(ArchiveIterator(warc, arc2warc=True)):
-            if i > 500:
-                self.logger.warning(f"Finished test run.")
-                break
-
+        for record in ArchiveIterator(warc, arc2warc=True):
             url = record.rec_headers.get_header("WARC-Target-URI")
 
             if not self.__is_valid_record(record):
@@ -243,5 +239,5 @@ class ExtractionJob:
         else:
             self.logger.warn(f"Failed to download '{self.basename}' "
                              f"(status code {response.status_code}).")
-        
+
         self.save_to_parquet()

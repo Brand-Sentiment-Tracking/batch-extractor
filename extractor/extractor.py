@@ -60,7 +60,7 @@ class ArticleExtractor:
             os.makedirs(path, exist_ok=True)
         elif not os.path.isdir(path):
             raise ValueError(f"'{path}' is not a directory.")
-        
+
         self.__parquet_dir = path
 
     @property
@@ -79,7 +79,7 @@ class ArticleExtractor:
         elif cores > os.cpu_count():
             raise ValueError(f"{cores} cores is greater than the "
                              "number of CPU cores available.")
-        
+
         self.__cores = cores
 
     @property
@@ -158,7 +158,7 @@ class ArticleExtractor:
     def report_counters(self):
         """Report the extracted/discarded/errored/total counters."""
         message = "Counter Update"
-        
+
         for name, counter in self.counters.items():
             message += f" {name}={counter}"
 
@@ -191,7 +191,7 @@ class ArticleExtractor:
             filenames = content.decode("utf-8").splitlines()
         else:
             self.logger.warn(f"Failed to download paths from '{paths_url}' "
-                         f"(status code {response.status_code}).")
+                             f"(status code {response.status_code}).")
 
             filenames = list()
 
@@ -274,7 +274,7 @@ class ArticleExtractor:
 
     def __on_job_success(self, result: Tuple[List[str], Dict[str, int]]):
         parquet_path, counters = result
-        
+
         self.__update_counters(counters)
         self.report_counters()
 
@@ -284,11 +284,11 @@ class ArticleExtractor:
         self.logger.error(f"Process exited with error:\n\t{str(error)}")
 
     @staticmethod
-    def run_extraction_job(warc_path: str, patterns: List[str], 
+    def run_extraction_job(warc_path: str, patterns: List[str],
                            date_crawled: datetime, parquet_dir: str,
                            log_level: int) -> Tuple[str, Dict[str, int]]:
 
-        job = ExtractionJob(warc_path, patterns, date_crawled, 
+        job = ExtractionJob(warc_path, patterns, date_crawled,
                             parquet_dir, log_level)
 
         job.extract_warc()
@@ -326,8 +326,8 @@ class ArticleExtractor:
 
         for warc in warc_paths:
             self.__submit_job(pool, warc, patterns)
-        
+
         pool.close()
         pool.join()
-        
+
         return self.parquet_files

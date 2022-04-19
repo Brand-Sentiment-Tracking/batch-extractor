@@ -28,8 +28,8 @@ class ArticleToParquetS3:
         partitions (Tuple[str]): The set of keys to partition the parquet file
             by. All available keys can be found in `self.FIELDS`.
     """
-    FIELDS = ("title", "main_text", "url", "source_domain", 
-             "date_publish", "date_crawled", "language")
+    FIELDS = ("title", "main_text", "url", "source_domain",
+              "date_publish", "date_crawled", "language")
 
     def __init__(self, bucket: str, max_records: int = None,
                  partitions: Optional[Tuple[str]] = None,
@@ -81,7 +81,7 @@ class ArticleToParquetS3:
             os.makedirs(path, exist_ok=True)
         elif not os.path.isdir(path):
             raise ValueError(f"'{path}' is not a directory.")
-        
+
         self.__parquet_dir = path
 
     @property
@@ -99,7 +99,7 @@ class ArticleToParquetS3:
             raise ValueError("Max records is not an integer.")
         elif n <= 0:
             raise ValueError("Max records must be greater than 0.")
-        
+
         self.__max_records = n
 
     @property

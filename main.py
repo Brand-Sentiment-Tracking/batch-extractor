@@ -18,8 +18,7 @@ end_date = environ.get("END_DATE")
 max_records = int(max_records)
 
 url_patterns = json.loads(url_patterns) \
-    if url_patterns is not None \
-        else ["*"]
+    if url_patterns is not None else ["*"]
 
 if start_date is not None and end_date is not None:
     start_date = datetime.fromisoformat(start_date)
