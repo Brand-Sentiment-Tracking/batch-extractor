@@ -1,6 +1,6 @@
 import unittest
 
-from ..extractor import CommonCrawlArticleExtractor
+from ..extractor import ArticleExtractor
 
 
 class TestCommonCrawlArticleExtractor(unittest.TestCase):
@@ -8,7 +8,7 @@ class TestCommonCrawlArticleExtractor(unittest.TestCase):
     def __init__(self, methodName: str = ...) -> None:
         super().__init__(methodName)
 
-        self.loader = CommonCrawlArticleExtractor()
+        self.loader = ArticleExtractor()
 
     def test_update_valid_callback(self):
         pass

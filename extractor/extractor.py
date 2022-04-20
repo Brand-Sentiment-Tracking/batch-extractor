@@ -71,7 +71,7 @@ class ArticleExtractor:
     def cores(self, cores):
         if cores is None:
             self.__cores = os.cpu_count()
-            logging.info(f"Setting cores to {self.cores}.")
+            self.logger.info(f"Setting cores to {self.cores}.")
             return
 
         if type(cores) != int:
@@ -267,21 +267,10 @@ class ArticleExtractor:
         filenames = list()
 
         for d in rrule(MONTHLY, self.start_date, until=self.end_date):
-            self.logger.info(f"Getting warc paths for {d.strftime('%b %Y')}.")
+            self.logger.info(f"Getting WARC paths for {d.strftime('%b %Y')}.")
             filenames.extend(self.__load_warc_paths(d.month, d.year))
 
         return self.__filter_warc_paths(filenames)
-
-    def __on_job_success(self, result: Tuple[List[str], Dict[str, int]]):
-        parquet_path, counters = result
-
-        self.__update_counters(counters)
-        self.report_counters()
-
-        self.parquet_files.append(parquet_path)
-
-    def __on_job_error(self, error: Exception):
-        self.logger.error(f"Process exited with error:\n\t{str(error)}")
 
     @staticmethod
     def run_extraction_job(warc_path: str, patterns: List[str],
@@ -294,6 +283,17 @@ class ArticleExtractor:
         job.extract_warc()
 
         return job.filename, job.counters
+
+    def __on_job_success(self, result: Tuple[List[str], Dict[str, int]]):
+        parquet_path, counters = result
+
+        self.__update_counters(counters)
+        self.report_counters()
+
+        self.parquet_files.append(parquet_path)
+
+    def __on_job_error(self, error: Exception):
+        self.logger.error(f"Process exited with error:\n\t{str(error)}")
 
     def __submit_job(self, pool, warc_path, patterns):
         warc_url = urljoin(self.CC_DOMAIN, warc_path)
@@ -321,6 +321,9 @@ class ArticleExtractor:
             end_date (datetime): The latest date the article must have been
                 crawled by.
         """
+        self.logger.info(f"Downloading articles crawled between "
+                         f"{start_date.date()} and {end_date.date()}.")
+
         warc_paths = self.retrieve_warc_paths(start_date, end_date)
         pool = multiprocessing.Pool(processes=self.cores)
 

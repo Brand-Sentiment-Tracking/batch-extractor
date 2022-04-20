@@ -30,7 +30,7 @@ class ExtractionJob:
 
     def __init__(self, warc_url: str, patterns: List[str],
                  date_crawled: datetime, warc_dir: str = "./parquets",
-                 log_level: int = logging.INFO):
+                 log_level: int = logging.INFO, report_every: int = 5000):
 
         self.warc_url = warc_url
         self.patterns = patterns
@@ -38,8 +38,10 @@ class ExtractionJob:
 
         self.warc_dir = warc_dir
 
+        self.report_every = report_every
+
         self.basename = os.path.basename(warc_url).split(".")[0]
-        self.job_name = f"ExtractionJob('{self.basename}')"
+        self.job_name = f"ExtractionJob({self.basename})"
 
         self.articles = list()
 
@@ -98,6 +100,15 @@ class ExtractionJob:
         self.__extracted = 0
         self.__discarded = 0
         self.__errored = 0
+
+    def report_counters(self):
+        """Report the extracted/discarded/errored/total counters."""
+        message = "Counter Update"
+
+        for name, counter in self.counters.items():
+            message += f" {name}={counter}"
+
+        self.logger.info(message)
 
     @property
     def filename(self):
@@ -179,13 +190,13 @@ class ExtractionJob:
 
         # Blanket error catch here. Should be made more specific.
         except Exception as e:
-            self.logger.warning(str(e))
+            self.logger.warning(f"Parser raised an exception:\n{repr(e)}")
             self.__errored += 1
             return
 
         self.add_article(article)
 
-    def __parse_records(self, warc: HTTPResponse):
+    def __parse_records(self, warc: HTTPResponse, file_size: int):
         """Iterate through articles from a warc file.
 
         Each record is loaded using warcio, and extracted if:
@@ -196,7 +207,10 @@ class ExtractionJob:
         Args:
             warc (HTTPResponse): The complete warc file as a stream.
         """
-        for record in ArchiveIterator(warc, arc2warc=True):
+        records = ArchiveIterator(warc, arc2warc=True)
+        self.logger.info("Iterating through records.")
+
+        for i, record in enumerate(records):
             url = record.rec_headers.get_header("WARC-Target-URI")
 
             if not self.__is_valid_record(record):
@@ -207,18 +221,23 @@ class ExtractionJob:
             try:
                 html = record.content_stream().read().decode("utf-8")
                 language = langdetect.detect(html)
-            except Exception:
-                self.logger.debug(f"Couldn't decode '{url}'")
+            
+            except Exception as e:
+                self.logger.warning(f"Record raised an exception:\n{repr(e)}")
                 self.__errored += 1
                 continue
 
             self.extract_article(url, html, language)
 
+            if i % self.report_every == 0:
+                self.report_counters()
+
+                percent = 100 * records.offset / file_size
+                self.logger.info(f"Extraction {percent:.2f}% complete.")
+
     def save_to_parquet(self):
         self.logger.info(f"Saving to '{self.filename}'")
-
-        pd.DataFrame(self.articles)\
-            .to_parquet(self.filename)
+        pd.DataFrame(self.articles).to_parquet(self.filename)
 
     def extract_warc(self):
         """Downloads and parses a warc file for article extraction.
@@ -231,11 +250,12 @@ class ExtractionJob:
             warc_path (str): The route of the warc file to be downloaded (not
                 including the CommonCrawl domain).
         """
-        self.logger.info(f"Downloading '{self.basename}'")
+        self.logger.info(f"Downloading WARC file.")
         response = requests.get(self.warc_url, stream=True)
 
         if response.ok:
-            self.__parse_records(response.raw)
+            file_size = int(response.headers.get("Content-Length"))
+            self.__parse_records(response.raw, file_size)
         else:
             self.logger.warn(f"Failed to download '{self.basename}' "
                              f"(status code {response.status_code}).")
