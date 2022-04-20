@@ -29,10 +29,6 @@ else:
     start_date = end_date - timedelta(days=1)
 
 uploader = ArticleToParquetS3(bucket_name, max_records=max_records)
-
-logging.info(f"Downloading articles crawled between "
-             f"{start_date.date()} and {end_date.date()}.")
-
 uploader.run(url_patterns, start_date, end_date)
 
 logging.info("Completed Extraction job.")
