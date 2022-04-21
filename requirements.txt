@@ -5,3 +5,4 @@ langdetect
 newspaper3k
 pandas
 pyarrow
+lxml

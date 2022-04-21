@@ -1,11 +1,15 @@
 import re
+import time
 import logging
 import requests
 import langdetect
+
 import pandas as pd
 
 import os.path
+import lxml.html
 
+from traceback import format_exc
 from typing import List, Dict
 
 from datetime import datetime
@@ -23,6 +27,8 @@ from newspaper.utils import get_available_languages
 class ExtractionJob:
 
     CONTENT_RE = re.compile(r"^(?P<mime>[\w\/]+);\s?charset=(?P<charset>.*)$")
+    LANGUAGE_RE = re.compile(r"^(?P<language>\w{2})(?:$|[\-_](?P<dialect>\w+)$)")
+    
     SUPPORTED_LANGUAGES = get_available_languages()
 
     FIELDS = ("title", "main_text", "url", "source_domain",
@@ -110,6 +116,18 @@ class ExtractionJob:
 
         self.logger.info(message)
 
+    def report_progress(self, start_time, offset, file_size):
+        elasped_time = time.time() - start_time
+
+        percent = 100 * offset / file_size
+        remaining = 100 - percent
+
+        seconds_left = elasped_time * remaining / percent
+        minutes_left = seconds_left / 60
+        
+        self.logger.info(f"Extraction {percent:.2f}% complete. "
+                         f"~{minutes_left:.0f} mins left.")
+
     @property
     def filename(self):
         return os.path.join(self.warc_dir, f"{self.basename}.parquet")
@@ -163,6 +181,8 @@ class ExtractionJob:
             "language": article.config.get_language()
         })
 
+        #self.logger.error(f"'{article.title}' ({article.config.get_language()})")
+
     def extract_article(self, url: str, html: str, language: str):
         """Extracts the article from its html and update counters.
 
@@ -189,12 +209,27 @@ class ExtractionJob:
             self.__extracted += 1
 
         # Blanket error catch here. Should be made more specific.
-        except Exception as e:
-            self.logger.warning(f"Parser raised an exception:\n{repr(e)}")
+        except Exception:
+            self.logger.debug(f"Parser raised exception:\n{format_exc()}")
             self.__errored += 1
             return
 
         self.add_article(article)
+
+    def detect_language(self, html):
+        parser = lxml.html.fromstring(html)
+
+        language_string = str(parser.get("lang"))
+        match = self.LANGUAGE_RE.match(language_string)
+        
+        language = match.group("language") \
+            if match is not None else None
+
+        if language is None:
+            text = parser.text_content().strip()
+            language = langdetect.detect(text)
+
+        return language
 
     def __parse_records(self, warc: HTTPResponse, file_size: int):
         """Iterate through articles from a warc file.
@@ -210,7 +245,14 @@ class ExtractionJob:
         records = ArchiveIterator(warc, arc2warc=True)
         self.logger.info("Iterating through records.")
 
+        start_time = time.time()
+
         for i, record in enumerate(records):
+
+            if i % self.report_every == 0:
+                self.report_counters()
+                self.report_progress(start_time, records.offset, file_size)
+
             url = record.rec_headers.get_header("WARC-Target-URI")
 
             if not self.__is_valid_record(record):
@@ -220,20 +262,14 @@ class ExtractionJob:
 
             try:
                 html = record.content_stream().read().decode("utf-8")
-                language = langdetect.detect(html)
+                language = self.detect_language(html)
             
-            except Exception as e:
-                self.logger.warning(f"Record raised an exception:\n{repr(e)}")
+            except Exception:
+                self.logger.debug(f"Record raised exception:\n{format_exc()}")
                 self.__errored += 1
                 continue
 
             self.extract_article(url, html, language)
-
-            if i % self.report_every == 0:
-                self.report_counters()
-
-                percent = 100 * records.offset / file_size
-                self.logger.info(f"Extraction {percent:.2f}% complete.")
 
     def save_to_parquet(self):
         self.logger.info(f"Saving to '{self.filename}'")

@@ -325,6 +325,8 @@ class ArticleExtractor:
                          f"{start_date.date()} and {end_date.date()}.")
 
         warc_paths = self.retrieve_warc_paths(start_date, end_date)
+        self.logger.info(f"Found {len(warc_paths)} WARC files to process.")
+
         pool = multiprocessing.Pool(processes=self.cores)
 
         for warc in warc_paths:

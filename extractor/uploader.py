@@ -144,7 +144,7 @@ class ArticleToParquetS3:
         self.extractor.download_articles(patterns, start_date, end_date)
 
         if not self.extractor.parquet_files:
-            logging.error("No parquet files were found.")
+            self.logger.error("No parquet files were found.")
             return
 
         self.upload_parquet_to_s3(self.extractor.parquet_files)
