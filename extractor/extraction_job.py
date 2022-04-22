@@ -4,13 +4,14 @@ import logging
 import requests
 import langdetect
 
-import pandas as pd
+import pyarrow as pa
+from pyarrow import parquet
 
 import os.path
 import lxml.html
 
 from traceback import format_exc
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 from datetime import datetime
 
@@ -117,6 +118,10 @@ class ExtractionJob:
         self.logger.info(message)
 
     def report_progress(self, start_time, offset, file_size):
+        if file_size is None or file_size == 0:
+            self.logger.debug("Filesize unknown, cannot report progress.")
+            return
+
         elasped_time = time.time() - start_time
 
         percent = 100 * offset / file_size
@@ -231,7 +236,7 @@ class ExtractionJob:
 
         return language
 
-    def __parse_records(self, warc: HTTPResponse, file_size: int):
+    def __parse_records(self, warc: HTTPResponse, file_size: Optional[int]):
         """Iterate through articles from a warc file.
 
         Each record is loaded using warcio, and extracted if:
@@ -273,7 +278,8 @@ class ExtractionJob:
 
     def save_to_parquet(self):
         self.logger.info(f"Saving to '{self.filename}'")
-        pd.DataFrame(self.articles).to_parquet(self.filename)
+        table = pa.Table.from_pylist(self.articles)
+        parquet.write_table(table, self.filename, flavor="spark")
 
     def extract_warc(self):
         """Downloads and parses a warc file for article extraction.
@@ -290,7 +296,12 @@ class ExtractionJob:
         response = requests.get(self.warc_url, stream=True)
 
         if response.ok:
-            file_size = int(response.headers.get("Content-Length"))
+            file_size_string = response.headers.get("Content-Length")
+            
+            file_size = int(file_size_string) \
+                if file_size_string is not None \
+                else None
+
             self.__parse_records(response.raw, file_size)
         else:
             self.logger.warn(f"Failed to download '{self.basename}' "
