@@ -28,7 +28,7 @@ else:
     end_date = datetime.fromisoformat(date.today().isoformat())
     start_date = end_date - timedelta(days=1)
 
-uploader = ArticleToParquetS3(bucket_name, max_records=max_records)
+uploader = ArticleToParquetS3(bucket_name, max_records)
 uploader.run(url_patterns, start_date, end_date)
 
 logging.info("Completed Extraction job.")

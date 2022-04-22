@@ -249,7 +249,7 @@ class ExtractionJob:
 
         for i, record in enumerate(records):
 
-            if i % self.report_every == 0:
+            if i != 0 and i % self.report_every == 0:
                 self.report_counters()
                 self.report_progress(start_time, records.offset, file_size)
 

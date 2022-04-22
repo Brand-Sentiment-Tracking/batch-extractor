@@ -31,7 +31,7 @@ class ArticleToParquetS3:
     FIELDS = ("title", "main_text", "url", "source_domain",
               "date_publish", "date_crawled", "language")
 
-    def __init__(self, bucket: str, max_records: int = None,
+    def __init__(self, bucket: str, max_records: int,
                  partitions: Optional[Tuple[str]] = None,
                  log_level: int = logging.INFO,
                  parquet_dir: str = "./parquets",
@@ -125,10 +125,11 @@ class ArticleToParquetS3:
     def report_counters(self):
         self.extractor.report_counters()
 
-    def upload_parquet_to_s3(self, parquet_files):
-        df = self.spark.read.parquet(*parquet_files)
+    def upload_parquet_to_s3(self, parquet_file):
+        basename = os.path.basename(parquet_file)
+        df = self.spark.read.parquet(parquet_file)
 
-        self.logger.info(f"Pushing to '{self.parquet_url}'")
+        self.logger.info(f"Pushing '{basename}' to '{self.bucket}' bucket.")
 
         df.repartition(*self.partitions) \
             .write.mode('append') \
@@ -136,7 +137,7 @@ class ArticleToParquetS3:
             .partitionBy(*self.partitions) \
             .parquet(self.parquet_url)
 
-        self.logger.info("Push successful.")
+        self.logger.info(f"'{basename}' push successful.")
 
     def run(self, patterns: List[str], start_date: datetime,
             end_date: datetime):
@@ -147,4 +148,5 @@ class ArticleToParquetS3:
             self.logger.error("No parquet files were found.")
             return
 
-        self.upload_parquet_to_s3(self.extractor.parquet_files)
+        for parquet_file in self.extractor.parquet_files:
+            self.upload_parquet_to_s3(parquet_file)

@@ -293,7 +293,7 @@ class ArticleExtractor:
         self.parquet_files.append(parquet_path)
 
     def __on_job_error(self, error: Exception):
-        self.logger.error(f"Process exited with error:\n\t{str(error)}")
+        self.logger.error(f"Process exited with error:\n\t{repr(error)}")
 
     def __submit_job(self, pool, warc_path, patterns):
         warc_url = urljoin(self.CC_DOMAIN, warc_path)
