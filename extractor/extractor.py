@@ -30,7 +30,7 @@ class ArticleExtractor:
 
     def __init__(self, log_level: int = logging.INFO,
                  parquet_dir: str = "./parquets",
-                 cores: Optional[int] = None):
+                 processes: Optional[int] = None):
 
         self.log_level = log_level
 
@@ -38,7 +38,7 @@ class ArticleExtractor:
         self.logger.setLevel(self.log_level)
 
         self.parquet_dir = parquet_dir
-        self.cores = cores
+        self.processes = processes
 
         self.__start_date = None
         self.__end_date = None
@@ -64,23 +64,23 @@ class ArticleExtractor:
         self.__parquet_dir = path
 
     @property
-    def cores(self):
-        return self.__cores
+    def processes(self):
+        return self.__processes
 
-    @cores.setter
-    def cores(self, cores):
-        if cores is None:
-            self.__cores = os.cpu_count()
-            self.logger.info(f"Setting cores to {self.cores}.")
+    @processes.setter
+    def processes(self, processes):
+        if processes is None:
+            self.__processes = os.cpu_count()
+            self.logger.info(f"Setting pool processes to {self.processes}.")
             return
 
-        if type(cores) != int:
-            raise ValueError("Cores is not an integer.")
-        elif cores > os.cpu_count():
-            raise ValueError(f"{cores} cores is greater than the "
-                             "number of CPU cores available.")
+        if type(processes) != int:
+            raise ValueError("Pool processes is not an integer.")
+        elif processes > os.cpu_count():
+            raise ValueError(f"{processes} processes is greater than the "
+                             "number of CPUs available.")
 
-        self.__cores = cores
+        self.__processes = processes
 
     @property
     def start_date(self) -> datetime:
@@ -267,7 +267,7 @@ class ArticleExtractor:
         filenames = list()
 
         for d in rrule(MONTHLY, self.start_date, until=self.end_date):
-            self.logger.info(f"Getting WARC paths for {d.strftime('%b %Y')}.")
+            self.logger.info(f"Getting WARC paths for {d.strftime('%Y-%m')}.")
             filenames.extend(self.__load_warc_paths(d.month, d.year))
 
         return self.__filter_warc_paths(filenames)
@@ -327,7 +327,7 @@ class ArticleExtractor:
         warc_paths = self.retrieve_warc_paths(start_date, end_date)
         self.logger.info(f"Found {len(warc_paths)} WARC files to process.")
 
-        pool = multiprocessing.Pool(processes=self.cores)
+        pool = multiprocessing.Pool(processes=self.processes)
 
         for warc in warc_paths:
             self.__submit_job(pool, warc, patterns)
