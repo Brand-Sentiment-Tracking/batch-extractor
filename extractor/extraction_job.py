@@ -8,7 +8,6 @@ import pyarrow as pa
 from pyarrow import parquet
 
 import os.path
-import lxml.html
 
 from traceback import format_exc
 from typing import List, Dict, Optional
@@ -22,15 +21,11 @@ from warcio.archiveiterator import ArchiveIterator
 from warcio.recordloader import ArcWarcRecord
 
 from newspaper import Article
-from newspaper.utils import get_available_languages
 
 
 class ExtractionJob:
 
     CONTENT_RE = re.compile(r"^(?P<mime>[\w\/]+);\s?charset=(?P<charset>.*)$")
-    LANGUAGE_RE = re.compile(r"^(?P<language>\w{2})(?:$|[\-_](?P<dialect>\w+)$)")
-    
-    SUPPORTED_LANGUAGES = get_available_languages()
 
     FIELDS = ("title", "main_text", "url", "source_domain",
               "date_publish", "date_crawled", "language")
@@ -170,7 +165,7 @@ class ExtractionJob:
 
         return any(map(lambda url: fnmatch(source_url, url), self.patterns))
 
-    def add_article(self, article: Article):
+    def add_article(self, article: Article, language: str):
         try:
             date_published = article.publish_date.strftime("%Y-%m-%d")
         except (ValueError, AttributeError):
@@ -183,12 +178,10 @@ class ExtractionJob:
             "source_domain": article.source_url,
             "date_publish": date_published,
             "date_crawled": self.date_crawled.strftime("%Y-%m-%d"),
-            "language": article.config.get_language()
+            "language": language
         })
 
-        #self.logger.error(f"'{article.title}' ({article.config.get_language()})")
-
-    def extract_article(self, url: str, html: str, language: str):
+    def extract_article(self, url: str, html: str):
         """Extracts the article from its html and update counters.
 
         Once successfully extracted, it is then passed to `article_callback`.
@@ -201,16 +194,13 @@ class ExtractionJob:
             html (str): The complete HTML structure of the record.
             language (str): The two-char language code of the record.
         """
-        if language not in self.SUPPORTED_LANGUAGES:
-            self.logger.debug(f"Language not supported for '{url}'")
-            self.__discarded += 1
-            return
-
-        article = Article(url, language=language)
+        article = Article(url)
 
         try:
             article.download(input_html=html)
             article.parse()
+
+            language = langdetect.detect(article.text)
             self.__extracted += 1
 
         # Blanket error catch here. Should be made more specific.
@@ -219,22 +209,7 @@ class ExtractionJob:
             self.__errored += 1
             return
 
-        self.add_article(article)
-
-    def detect_language(self, html):
-        parser = lxml.html.fromstring(html)
-
-        language_string = str(parser.get("lang"))
-        match = self.LANGUAGE_RE.match(language_string)
-        
-        language = match.group("language") \
-            if match is not None else None
-
-        if language is None:
-            text = parser.text_content().strip()
-            language = langdetect.detect(text)
-
-        return language
+        self.add_article(article, language)
 
     def __parse_records(self, warc: HTTPResponse, file_size: Optional[int]):
         """Iterate through articles from a warc file.
@@ -255,7 +230,6 @@ class ExtractionJob:
         for i, record in enumerate(records):
 
             if i != 0 and i % self.report_every == 0:
-                self.report_counters()
                 self.report_progress(start_time, records.offset, file_size)
 
             url = record.rec_headers.get_header("WARC-Target-URI")
@@ -267,14 +241,12 @@ class ExtractionJob:
 
             try:
                 html = record.content_stream().read().decode("utf-8")
-                language = self.detect_language(html)
-            
             except Exception:
                 self.logger.debug(f"Record raised exception:\n{format_exc()}")
                 self.__errored += 1
                 continue
 
-            self.extract_article(url, html, language)
+            self.extract_article(url, html)
 
     def save_to_parquet(self):
         self.logger.info(f"Saving to '{self.filename}'")
