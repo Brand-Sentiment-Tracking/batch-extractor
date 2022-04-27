@@ -12,6 +12,8 @@ from dateutil.rrule import rrule, MONTHLY
 
 from urllib.parse import urljoin
 
+from multiprocessing.pool import Pool
+
 from .extraction_job import ExtractionJob
 
 
@@ -19,8 +21,14 @@ class ArticleExtractor:
     """Load and parse articles from CommonCrawl News Archive.
 
     Args:
-        article_callback (callable): A function that is called once an article
-            has been extracted.
+        log_level (logging._Level): The severity level of logs to be
+            reported, e.g., `DEBUG`, `INFO`, `WARN`, etc.
+        parquet_dir (str): The path to the local directory for storing
+            parquet files after extraction. The directory will automatically
+            be created if it doesn't already exist.
+        processes (int): The number of parallel processes to run when
+            extracting articles. If `None`, then the number of CPUs available
+            is used.
     """
     WARC_PATHS = "warc.paths.gz"
     CC_DOMAIN = "https://data.commoncrawl.org"
@@ -49,6 +57,12 @@ class ArticleExtractor:
 
     @property
     def parquet_dir(self):
+        """`str`: The path to the local directory for storing parquet files.
+
+        When defining the path, the setter will automatically create it if it
+        doesn't exist. The setter will also raise a ValueError if the new path
+        is not a string, or if the path exists but is not a directory.
+        """
         return self.__parquet_dir
 
     @parquet_dir.setter
@@ -64,11 +78,19 @@ class ArticleExtractor:
         self.__parquet_dir = path
 
     @property
-    def processes(self):
+    def processes(self) -> int:
+        """`int`: The number of CPU processors to run in parallel.
+
+        If set as `None`, the number of CPU processors available will be used
+        based off `os.cpu_count()`.
+
+        If the new value is greater than the number of CPUs available, or is
+        not an integer, a ValueError will be raised.
+        """
         return self.__processes
 
     @processes.setter
-    def processes(self, processes):
+    def processes(self, processes: Optional[int]):
         if processes is None:
             self.__processes = os.cpu_count()
             self.logger.info(f"Setting pool processes to {self.processes}.")
@@ -144,10 +166,11 @@ class ArticleExtractor:
             "total": total
         }
 
-    def __update_counters(self, counters):
-        self.__extracted += counters.get("extracted")
-        self.__discarded += counters.get("discarded")
-        self.__errored += counters.get("errored")
+    def __update_counters(self, counters: Dict[str, int]):
+        """Add the counters from an extraction job to the total counts."""
+        self.__extracted += counters.get("extracted", 0)
+        self.__discarded += counters.get("discarded", 0)
+        self.__errored += counters.get("errored", 0)
 
     def reset_counters(self):
         """Reset the counters for extracted/discarded/errored to zero."""
@@ -258,6 +281,12 @@ class ArticleExtractor:
         ones that fall between the dates based on the timestamp within the
         warc filename.
 
+        Args:
+            start_date (datetime): The starting date to filter the articles
+                between.
+            end_date (datetime): The ending date to filter the articles
+                between.
+
         Returns:
             List[str]: A list of warc filepaths.
         """
@@ -273,11 +302,30 @@ class ArticleExtractor:
         return self.__filter_warc_paths(filenames)
 
     @staticmethod
-    def run_extraction_job(warc_path: str, patterns: List[str],
+    def run_extraction_job(warc_url: str, patterns: List[str],
                            date_crawled: datetime, parquet_dir: str,
                            log_level: int) -> Tuple[str, Dict[str, int]]:
+        """Extract all the articles from a WARC and save to a parquet file.
 
-        job = ExtractionJob(warc_path, patterns, date_crawled,
+        Note:
+            This method is designed to run as a concurrent process, so it is
+            treated as a staticmethod, with all variables passed through the
+            function call.
+
+        Args:
+            warc_url (str): The WARC file URL to extract aricles from.
+            patterns (List[str]): The glob patterns for filtering articles
+                based off the source URL.
+            date_crawled (datetime): The publish date/time of the WARC file.
+            parquet_dir (str): The local directory to save parquet files to.
+            log_level (int): The minimum severity level the ExtractionJob logs
+                should report.
+
+        Returns:
+            str: The path to the parquet file containing the articles.
+            Dict[str, int]: The final counters from the extraction job.
+        """
+        job = ExtractionJob(warc_url, patterns, date_crawled,
                             parquet_dir, log_level)
 
         job.extract_warc()
@@ -285,17 +333,41 @@ class ArticleExtractor:
         return job.filename, job.counters
 
     def __on_job_success(self, result: Tuple[List[str], Dict[str, int]]):
+        """The process callback for a successful extraction job.
+
+        The callback will add the parquet file to the list of filepaths,
+        updates the total counters with those from the extraction job and
+        reports them.
+
+        Args:
+            result: Passed from `run_extraction_job()` as a tuple containing:
+                str: The path to the parquet file containing the articles.
+                Dict[str, int]: The final counters from the extraction job.
+        """
         parquet_path, counters = result
 
         self.__update_counters(counters)
         self.report_counters()
 
-        self.parquet_files.append(parquet_path)
+        if counters.get("extracted", 0) > 0:
+            self.parquet_files.append(parquet_path)
+        else:
+            self.logger.info(f"Ignoring '{parquet_path}' since it is empty.")
 
     def __on_job_error(self, error: Exception):
+        """The process callback for a failed job. Simply logs the error."""
         self.logger.error(f"Process exited with error:\n\t{repr(error)}")
 
-    def __submit_job(self, pool, warc_path, patterns):
+    def __submit_job(self, pool: Pool, warc_path: str, patterns: List[str]):
+        """Submit an extraction job to the process pool.
+
+        Args:
+            pool (multiprocessing.pool.Pool): The process pool to submit async
+                jobs to.
+            warc_url (str): The WARC file URL to extract aricles from.
+            patterns (List[str]): The glob patterns for filtering articles
+                based off the source URL.
+        """
         warc_url = urljoin(self.CC_DOMAIN, warc_path)
         date_crawled = self.__extract_date(warc_path)
 

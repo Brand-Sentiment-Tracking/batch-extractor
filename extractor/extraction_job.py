@@ -24,21 +24,36 @@ from newspaper import Article
 
 
 class ExtractionJob:
+    """Download and extract articles from a single WARC file.
 
+    This is designed to run concurrently with minimal shared memory, so when
+    all the articles have been extracted, they are then saved to a parquet
+    file locally (in `parquet_dir`) instead of being passed back as a
+    variable.
+
+    Args:
+        warc_url (str): The WARC file URL to extract aricles from.
+        patterns (List[str]): The glob patterns for filtering articles
+            based off the source URL.
+        date_crawled (datetime): The publish date/time of the WARC file.
+        log_level (logging._Level): The severity level of logs to be
+            reported, e.g., `DEBUG`, `INFO`, `WARN`, etc.
+        report_every (int): The number of records to iterate through before
+            reporting the status of the extraction job.
+    """
     CONTENT_RE = re.compile(r"^(?P<mime>[\w\/]+);\s?charset=(?P<charset>.*)$")
-
     FIELDS = ("title", "main_text", "url", "source_domain",
               "date_publish", "date_crawled", "language")
 
     def __init__(self, warc_url: str, patterns: List[str],
-                 date_crawled: datetime, warc_dir: str = "./parquets",
+                 date_crawled: datetime, parquet_dir: str = "./parquets",
                  log_level: int = logging.INFO, report_every: int = 5000):
 
         self.warc_url = warc_url
         self.patterns = patterns
         self.date_crawled = date_crawled
 
-        self.warc_dir = warc_dir
+        self.parquet_dir = parquet_dir
 
         self.report_every = report_every
 
@@ -51,6 +66,17 @@ class ExtractionJob:
         self.logger.setLevel(log_level)
 
         self.reset_counters()
+
+    @property
+    def warc_url(self) -> str:
+        return self.__warc_url
+
+    @warc_url.setter
+    def warc_url(self, url: str):
+        if type(url) != str:
+            raise ValueError("WARC URL is not a string.")
+        
+        self.__warc_url = url
 
     @property
     def patterns(self) -> List[str]:
@@ -70,6 +96,22 @@ class ExtractionJob:
             raise ValueError("Not all URL patterns are strings.")
 
         self.__patterns = patterns
+
+    @property
+    def date_crawled(self):
+        return self.__date_crawled
+
+    def date_crawled(self, date: datetime):
+        if type(date) != datetime:
+            raise ValueError("Date is not a datetime object.")
+        elif date > datetime.now():
+            raise ValueError("Date is in the future.")
+            
+        self.__date_crawled = date
+
+    @property
+    def filename(self):
+        return os.path.join(self.parquet_dir, f"{self.basename}.parquet")
 
     @property
     def extracted(self) -> int:
@@ -112,25 +154,38 @@ class ExtractionJob:
 
         self.logger.info(message)
 
-    def report_progress(self, start_time, offset, file_size):
+    def report_progress(self, start_time: int, offset: int, file_size: int):
+        """Log the percentage of records processed in the WARC file.
+
+        This is based off the `Content-Length` header in the request and
+        comparing it to the byte the iterator is currently reading (i.e.
+        `ArchiveIterator.offset`).
+
+        Note:
+            If Content-Length is None or zero, no report will be logged.
+
+        Args:
+            start_time (int): The UNIX timestamp of when the record
+                iteration began. This is used to determine approximately how
+                long it will take to complete the extraction job.
+            offset (int): The byte position currently being read by the
+                ArchiveIterator.
+            file_size (int): The total number of bytes in the WARC file, given
+                by the Content-Length header of the request.
+        """
         if file_size is None or file_size == 0:
             self.logger.debug("Filesize unknown, cannot report progress.")
             return
 
-        elasped_time = time.time() - start_time
+        minutes = (time.time() - start_time) / 60
 
-        percent = 100 * offset / file_size
-        remaining = 100 - percent
+        percent_complete = 100 * offset / file_size
+        percent_remaining = 100 - percent_complete
 
-        seconds_left = elasped_time * remaining / percent
-        minutes_left = seconds_left / 60
+        minutes_left = minutes * percent_remaining / percent_complete
         
-        self.logger.info(f"Extraction {percent:.2f}% complete. "
+        self.logger.info(f"Extraction {percent_complete:.2f}% complete. "
                          f"~{minutes_left:.0f} mins left.")
-
-    @property
-    def filename(self):
-        return os.path.join(self.warc_dir, f"{self.basename}.parquet")
 
     def __is_valid_record(self, record: ArcWarcRecord) -> bool:
         """Checks whether a warc record should be extracted to an article.
@@ -200,13 +255,18 @@ class ExtractionJob:
             article.download(input_html=html)
             article.parse()
 
-            language = langdetect.detect(article.text)
+            if article.text:
+                language = langdetect.detect(article.text)
+            else:
+                language = langdetect.detect(article.title)
+
             self.__extracted += 1
 
         # Blanket error catch here. Should be made more specific.
         except Exception:
-            self.logger.debug(f"Parser raised exception:\n{format_exc()}")
+            self.logger.info(f"Parser raised exception:\n{format_exc()}")
             self.__errored += 1
+
             return
 
         self.add_article(article, language)
@@ -242,7 +302,7 @@ class ExtractionJob:
             try:
                 html = record.content_stream().read().decode("utf-8")
             except Exception:
-                self.logger.debug(f"Record raised exception:\n{format_exc()}")
+                self.logger.info(f"Record raised exception:\n{format_exc()}")
                 self.__errored += 1
                 continue
 
@@ -251,6 +311,7 @@ class ExtractionJob:
     def save_to_parquet(self):
         self.logger.info(f"Saving to '{self.filename}'")
         table = pa.Table.from_pylist(self.articles)
+
         parquet.write_table(table, self.filename, flavor="spark")
 
     def extract_warc(self):
