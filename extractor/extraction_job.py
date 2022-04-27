@@ -304,7 +304,7 @@ class ExtractionJob:
 
         # Blanket error catch here. Should be made more specific.
         except Exception:
-            self.logger.info(f"Parser raised exception:\n{format_exc()}")
+            self.logger.debug(f"Parser raised exception:\n{format_exc()}")
             self.__errored += 1
 
             return
@@ -329,6 +329,10 @@ class ExtractionJob:
 
         for i, record in enumerate(records):
 
+            if i > 200:
+                self.logger.info("Early stop.")
+                break
+
             if i != 0 and i % self.report_every == 0:
                 self.report_progress(start_time, records.offset, file_size)
 
@@ -342,7 +346,7 @@ class ExtractionJob:
             try:
                 html = record.content_stream().read().decode("utf-8")
             except Exception:
-                self.logger.info(f"Record raised exception:\n{format_exc()}")
+                self.logger.debug(f"Record raised exception:\n{format_exc()}")
                 self.__errored += 1
                 continue
 

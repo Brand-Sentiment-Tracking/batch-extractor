@@ -35,7 +35,7 @@ class ArticleToParquetS3:
                  partitions: Optional[Tuple[str]] = None,
                  log_level: int = logging.INFO,
                  parquet_dir: str = "./parquets",
-                 cores: int = None):
+                 processes: int = None):
 
         self.logger = logging.getLogger("ArticleToParquetS3")
         self.logger.setLevel(log_level)
@@ -48,7 +48,8 @@ class ArticleToParquetS3:
         self.partitions = partitions if partitions is not None \
             else ("date_crawled", "language")
 
-        self.extractor = ArticleExtractor(log_level, parquet_dir, cores)
+        self.extractor = ArticleExtractor(self.upload_to_s3, log_level,
+                                          parquet_dir, processes)
 
         self.spark = SparkSession.builder \
             .appName("ArticleToParquet") \
@@ -125,7 +126,7 @@ class ArticleToParquetS3:
     def report_counters(self):
         self.extractor.report_counters()
 
-    def upload_parquet_to_s3(self, parquet_file):
+    def upload_to_s3(self, parquet_file):
         basename = os.path.basename(parquet_file)
         df = self.spark.read.parquet(parquet_file)
 
@@ -143,10 +144,3 @@ class ArticleToParquetS3:
             end_date: datetime):
 
         self.extractor.download_articles(patterns, start_date, end_date)
-
-        if not self.extractor.parquet_files:
-            self.logger.error("No parquet files were found.")
-            return
-
-        for parquet_file in self.extractor.parquet_files:
-            self.upload_parquet_to_s3(parquet_file)

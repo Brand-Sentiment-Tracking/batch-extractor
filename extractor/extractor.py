@@ -3,16 +3,15 @@ import re
 import gzip
 import requests
 import logging
-import multiprocessing
 
-from typing import List, Dict, Optional, Tuple
+from typing import Callable, List, Dict, Optional, Tuple
 
 from datetime import datetime
 from dateutil.rrule import rrule, MONTHLY
 
 from urllib.parse import urljoin
 
-from multiprocessing.pool import Pool
+from multiprocessing.pool import Pool, ThreadPool
 
 from .extraction_job import ExtractionJob
 
@@ -36,9 +35,14 @@ class ArticleExtractor:
 
     WARC_FILE_RE = re.compile(r"CC-NEWS-(?P<time>\d{14})-(?P<serial>\d{5})")
 
-    def __init__(self, log_level: int = logging.INFO,
+    ArticleCallback = Callable[[str], None]
+
+    def __init__(self, article_callback: ArticleCallback,
+                 log_level: int = logging.INFO,
                  parquet_dir: str = "./parquets",
                  processes: Optional[int] = None):
+
+        self.article_callback = article_callback
 
         self.log_level = log_level
 
@@ -54,6 +58,9 @@ class ArticleExtractor:
         self.reset_counters()
 
         self.parquet_files = list()
+
+        self.extracts_pool = None
+        self.callback_pool = None
 
     @property
     def parquet_dir(self):
@@ -186,6 +193,10 @@ class ArticleExtractor:
             message += f" {name}={counter}"
 
         self.logger.info(message)
+
+    def reset_attributes(self):
+        self.reset_counters()
+        self.parquet_files = list()
 
     def __load_warc_paths(self, month: int, year: int) -> List[str]:
         """Returns a list of warc files for a single month/year archive.
@@ -330,7 +341,10 @@ class ArticleExtractor:
 
         job.extract_warc()
 
-        return job.filename, job.counters
+        return job.filepath, job.counters
+
+    def __on_cb_error(self, error: Exception):
+        self.logger.error(f"Callback exited with error:\n\t{repr(error)}")
 
     def __on_job_success(self, result: Tuple[List[str], Dict[str, int]]):
         """The process callback for a successful extraction job.
@@ -349,16 +363,18 @@ class ArticleExtractor:
         self.__update_counters(counters)
         self.report_counters()
 
-        if counters.get("extracted", 0) > 0:
-            self.parquet_files.append(parquet_path)
-        else:
-            self.logger.info(f"Ignoring '{parquet_path}' since it is empty.")
+        if counters.get("extracted", 0) == 0:
+            self.logger.info(f"Discarding '{parquet_path}' as it is empty.")
+            return
+        
+        self.callback_pool \
+            .apply(self.article_callback, (parquet_path,))
 
     def __on_job_error(self, error: Exception):
         """The process callback for a failed job. Simply logs the error."""
         self.logger.error(f"Process exited with error:\n\t{repr(error)}")
 
-    def __submit_job(self, pool: Pool, warc_path: str, patterns: List[str]):
+    def __submit_job(self, warc_path: str):
         """Submit an extraction job to the process pool.
 
         Args:
@@ -371,10 +387,11 @@ class ArticleExtractor:
         warc_url = urljoin(self.CC_DOMAIN, warc_path)
         date_crawled = self.__extract_date(warc_path)
 
-        args = (warc_url, patterns, date_crawled,
+        args = (warc_url, self.patterns, date_crawled,
                 self.parquet_dir, self.log_level)
 
-        pool.apply_async(self.run_extraction_job, args,
+        self.extraction_pool \
+            .apply_async(self.run_extraction_job, args,
                          callback=self.__on_job_success,
                          error_callback=self.__on_job_error)
 
@@ -393,18 +410,23 @@ class ArticleExtractor:
             end_date (datetime): The latest date the article must have been
                 crawled by.
         """
+        self.reset_attributes()
+        self.patterns = patterns
+
         self.logger.info(f"Downloading articles crawled between "
                          f"{start_date.date()} and {end_date.date()}.")
 
         warc_paths = self.retrieve_warc_paths(start_date, end_date)
         self.logger.info(f"Found {len(warc_paths)} WARC files to process.")
 
-        pool = multiprocessing.Pool(processes=self.processes)
+        self.extraction_pool = Pool(processes=self.processes)
+        self.callback_pool = ThreadPool(processes=self.processes)
 
         for warc in warc_paths:
-            self.__submit_job(pool, warc, patterns)
+            self.__submit_job(warc)
 
-        pool.close()
-        pool.join()
+        self.extraction_pool.close()
+        self.extraction_pool.join()
 
-        return self.parquet_files
+        self.callback_pool.close()
+        self.callback_pool.join()
