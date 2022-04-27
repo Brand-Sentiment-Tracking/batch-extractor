@@ -42,6 +42,7 @@ class ExtractionJob:
             reporting the status of the extraction job.
     """
     CONTENT_RE = re.compile(r"^(?P<mime>[\w\/]+);\s?charset=(?P<charset>.*)$")
+    
     FIELDS = ("title", "main_text", "url", "source_domain",
               "date_publish", "date_crawled", "language")
 
@@ -52,13 +53,8 @@ class ExtractionJob:
         self.warc_url = warc_url
         self.patterns = patterns
         self.date_crawled = date_crawled
-
         self.parquet_dir = parquet_dir
-
         self.report_every = report_every
-
-        self.basename = os.path.basename(warc_url).split(".")[0]
-        self.job_name = f"ExtractionJob({self.basename})"
 
         self.articles = list()
 
@@ -77,6 +73,7 @@ class ExtractionJob:
             raise ValueError("WARC URL is not a string.")
         
         self.__warc_url = url
+        self.__basename = os.path.basename(url).split(".")[0]
 
     @property
     def patterns(self) -> List[str]:
@@ -110,7 +107,50 @@ class ExtractionJob:
         self.__date_crawled = date
 
     @property
-    def filename(self):
+    def parquet_dir(self) -> str:
+        """`str`: The path to the local directory for storing parquet files.
+
+        When defining the path, the setter will automatically create it if it
+        doesn't exist. The setter will also raise a ValueError if the new path
+        is not a string, or if the path exists but is not a directory.
+        """
+        return self.__parquet_dir
+
+    @parquet_dir.setter
+    def parquet_dir(self, path: str):
+        if type(path) != str:
+            raise ValueError("Path is not a string.")
+        elif not os.path.exists(path):
+            self.logger.debug(f"Creating directory '{path}'.")
+            os.makedirs(path, exist_ok=True)
+        elif not os.path.isdir(path):
+            raise ValueError(f"'{path}' is not a directory.")
+
+        self.__parquet_dir = path
+
+    @property
+    def report_every(self) -> int:
+        return self.__report_every
+
+    @report_every.setter
+    def report_every(self, n: int):
+        if type(n) != int:
+            raise ValueError("Report Every is not an integer.")
+        elif n <= 0:
+            raise ValueError("Report Every must be greater than zero.")
+
+        self.__report_every = n
+
+    @property
+    def basename(self) -> str:
+        return self.__basename
+
+    @property
+    def job_name(self) -> str:
+        return f"ExtractionJob({self.basename})"
+
+    @property
+    def filepath(self) -> str:
         return os.path.join(self.parquet_dir, f"{self.basename}.parquet")
 
     @property
@@ -309,10 +349,10 @@ class ExtractionJob:
             self.extract_article(url, html)
 
     def save_to_parquet(self):
-        self.logger.info(f"Saving to '{self.filename}'")
+        self.logger.info(f"Saving to '{self.filepath}'")
         table = pa.Table.from_pylist(self.articles)
 
-        parquet.write_table(table, self.filename, flavor="spark")
+        parquet.write_table(table, self.filepath, flavor="spark")
 
     def extract_warc(self):
         """Downloads and parses a warc file for article extraction.
