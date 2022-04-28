@@ -304,9 +304,8 @@ class ExtractionJob:
 
         # Blanket error catch here. Should be made more specific.
         except Exception:
-            self.logger.info(f"Parser raised exception:\n{format_exc()}")
+            self.logger.debug(f"Parser raised exception:\n{format_exc()}")
             self.__errored += 1
-
             return
 
         self.add_article(article, language)
@@ -330,6 +329,7 @@ class ExtractionJob:
         for i, record in enumerate(records):
 
             if i != 0 and i % self.report_every == 0:
+                self.report_counters()
                 self.report_progress(start_time, records.offset, file_size)
 
             url = record.rec_headers.get_header("WARC-Target-URI")
@@ -342,7 +342,7 @@ class ExtractionJob:
             try:
                 html = record.content_stream().read().decode("utf-8")
             except Exception:
-                self.logger.info(f"Record raised exception:\n{format_exc()}")
+                self.logger.debug(f"Record raised exception:\n{format_exc()}")
                 self.__errored += 1
                 continue
 

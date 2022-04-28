@@ -330,7 +330,7 @@ class ArticleExtractor:
 
         job.extract_warc()
 
-        return job.filename, job.counters
+        return job.filepath, job.counters
 
     def __on_job_success(self, result: Tuple[List[str], Dict[str, int]]):
         """The process callback for a successful extraction job.

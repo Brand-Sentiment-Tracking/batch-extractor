@@ -1,7 +1,9 @@
+# Date parsing
 python-dateutil
-pyspark
+# Article Extraction
 warcio
-langdetect
 newspaper3k
+langdetect
+# Parquet Writing
 pyarrow
-lxml
+pyspark
