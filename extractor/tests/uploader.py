@@ -1,6 +1,6 @@
 import unittest
 
-from ..uploader import ArticleToParquetS3
+from .. import ArticleToParquetS3
 
 
 class TestArticleToParquetS3(unittest.TestCase):
