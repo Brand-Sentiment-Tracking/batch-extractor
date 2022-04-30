@@ -35,7 +35,7 @@ class ArticleToParquetS3:
                  partitions: Optional[Tuple[str]] = None,
                  log_level: int = logging.INFO,
                  parquet_dir: str = "./parquets",
-                 cores: int = None):
+                 processors: int = None):
 
         self.logger = logging.getLogger("ArticleToParquetS3")
         self.logger.setLevel(log_level)
@@ -48,7 +48,7 @@ class ArticleToParquetS3:
         self.partitions = partitions if partitions is not None \
             else ("date_crawled", "language")
 
-        self.extractor = ArticleExtractor(log_level, parquet_dir, cores)
+        self.extractor = ArticleExtractor(parquet_dir, processors, log_level)
 
         self.spark = SparkSession.builder \
             .appName("ArticleToParquet") \

@@ -47,8 +47,9 @@ class ExtractionJob:
               "date_publish", "date_crawled", "language")
 
     def __init__(self, warc_url: str, patterns: List[str],
-                 date_crawled: datetime, parquet_dir: str = "./parquets",
-                 log_level: int = logging.INFO, report_every: int = 5000):
+                 date_crawled: datetime, parquet_dir: str,
+                 log_level: int = logging.INFO,
+                 report_every: int = 5000):
 
         self.warc_url = warc_url
         self.patterns = patterns
@@ -262,17 +263,19 @@ class ExtractionJob:
 
     def add_article(self, article: Article, language: str):
         try:
-            date_published = article.publish_date.strftime("%Y-%m-%d")
+            date_publish = article.publish_date.strftime("%Y-%m-%d")
         except (ValueError, AttributeError):
-            date_published = None
+            date_publish = None
+
+        date_crawled = self.date_crawled.strftime("%Y-%m-%d")
 
         self.articles.append({
             "title": article.title,
             "main_text": article.text,
             "url": article.url,
             "source_domain": article.source_url,
-            "date_publish": date_published,
-            "date_crawled": self.date_crawled.strftime("%Y-%m-%d"),
+            "date_publish": date_publish,
+            "date_crawled": date_crawled,
             "language": language
         })
 

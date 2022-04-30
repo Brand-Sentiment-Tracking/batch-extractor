@@ -36,9 +36,8 @@ class ArticleExtractor:
 
     WARC_FILE_RE = re.compile(r"CC-NEWS-(?P<time>\d{14})-(?P<serial>\d{5})")
 
-    def __init__(self, log_level: int = logging.INFO,
-                 parquet_dir: str = "./parquets",
-                 processes: Optional[int] = None):
+    def __init__(self, parquet_dir: str, processes: Optional[int] = None,
+                 log_level: int = logging.INFO):
 
         self.log_level = log_level
 
