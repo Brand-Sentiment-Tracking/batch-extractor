@@ -124,7 +124,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertEqual(str(e2), "Report Every must be greater than zero.")
 
     def test_is_valid_record_not_response(self):
-        file = "test-request.warc"
+        file = "records/test-request.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -133,7 +133,7 @@ class TestExtractionJob(unittest.TestCase):
 
 
     def test_is_valid_record_no_source_url(self):
-        file = "test-invalid-response-no-source.warc"
+        file = "records/test-invalid-response-no-source.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -141,7 +141,7 @@ class TestExtractionJob(unittest.TestCase):
             self.assertFalse(self.job.is_valid_record(record))
 
     def test_is_valid_record_no_content_type(self):
-        file = "test-invalid-response-no-content-type.warc"
+        file = "records/test-invalid-response-no-content-type.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -149,7 +149,7 @@ class TestExtractionJob(unittest.TestCase):
             self.assertFalse(self.job.is_valid_record(record))
 
     def test_is_valid_record_bad_encoding(self):
-        file = "test-invalid-response-not-utf8.warc"
+        file = "records/test-invalid-response-not-utf8.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -157,7 +157,7 @@ class TestExtractionJob(unittest.TestCase):
             self.assertFalse(self.job.is_valid_record(record))
 
     def test_is_valid_record_bad_mimetype(self):
-        file = "test-invalid-response-not-text-html.warc"
+        file = "records/test-invalid-response-not-text-html.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -167,7 +167,7 @@ class TestExtractionJob(unittest.TestCase):
     def test_is_valid_record_no_matching_pattern(self):
         self.job.patterns = ["*bbc.co.uk*"]
 
-        file = "test-valid-response.warc"
+        file = "records/test-valid-response.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -175,7 +175,7 @@ class TestExtractionJob(unittest.TestCase):
             self.assertFalse(self.job.is_valid_record(record))
 
     def test_is_valid_record_with_valid_record(self):
-        file = "test-valid-response.warc"
+        file = "records/test-valid-response.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -183,7 +183,7 @@ class TestExtractionJob(unittest.TestCase):
             self.assertTrue(self.job.is_valid_record(record))
 
     def test_extract_article(self):
-        file = "test-valid-response.warc"
+        file = "records/test-valid-response.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -202,7 +202,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertIsNotNone(article.url)
 
     def test_add_article_no_publish_date(self):
-        file = "test-valid-response.warc"
+        file = "records/test-valid-response.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -217,7 +217,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertIsNone(self.job.articles[0].get("date_publish"))
 
     def test_add_article_with_publish_date(self):
-        file = "test-valid-response.warc"
+        file = "records/test-valid-response.warc"
         path = os.path.join(self.resources, file)
 
         with open(path, "rb") as f:
@@ -230,7 +230,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertIsNotNone(self.job.articles[0].get("date_publish"))
 
     def test_save_to_parquet(self):
-        file = "test-valid-response.warc"
+        file = "records/test-valid-response.warc"
         path = os.path.join(self.resources, file)
         
         parquet = f"{self.parquets}/{self.job.basename}.parquet"
