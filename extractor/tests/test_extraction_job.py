@@ -16,8 +16,8 @@ class TestExtractionJob(unittest.TestCase):
         self.start_date = datetime.now()
         self.resources = "./extractor/tests/resources"
 
-        self.parquets = os.path.join(self.resources, "parquets")
-        self.test_parquets = os.path.join(self.resources, "test-parquets")
+        self.parquets = f"{self.resources}/parquets"
+        self.test_parquets = f"{self.resources}/test-parquets"
 
         self.job = None
 
@@ -94,7 +94,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertTrue(os.path.isdir(self.test_parquets))
 
     def test_invalid_parquet_directory(self):
-        filepath = "./extractor/tests/resources/placeholder.txt"
+        filepath = f"{self.resources}/placeholder.txt"
 
         with self.assertRaises(ValueError) as a1:
             self.job.parquet_dir = 123

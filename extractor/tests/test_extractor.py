@@ -15,8 +15,8 @@ class TestArticleExtractor(unittest.TestCase):
         self.start_date = datetime.now()
         self.resources = "./extractor/tests/resources"
 
-        self.parquets = os.path.join(self.resources, "parquets")
-        self.test_parquets = os.path.join(self.resources, "test-parquets")
+        self.parquets = f"{self.resources}/parquets"
+        self.test_parquets = f"{self.resources}/test-parquets"
 
         self.extractor = None
     
@@ -32,7 +32,7 @@ class TestArticleExtractor(unittest.TestCase):
         self.assertTrue(os.path.isdir(self.test_parquets))
 
     def test_invalid_parquet_directory(self):
-        filepath = "./extractor/tests/resources/placeholder.txt"
+        filepath = f"{self.resources}/placeholder.txt"
 
         with self.assertRaises(ValueError) as a1:
             self.extractor.parquet_dir = 123
@@ -171,3 +171,6 @@ class TestArticleExtractor(unittest.TestCase):
         total_rows = df1.shape[0] + df2.shape[0]
 
         self.assertEqual(counters.get("extracted"), total_rows)
+
+if __name__ == "__main__":
+    unittest.main()

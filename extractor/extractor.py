@@ -380,8 +380,7 @@ class ArticleExtractor:
                          error_callback=self.__on_job_error)
 
     def download_articles(self, patterns: List[str], start_date: datetime,
-                          end_date: datetime,
-                          limit: Optional[int] = None) -> List[str]:
+                          end_date: datetime, limit: Optional[int] = None):
         """Downloads and extracts articles from CC-NEWS.
 
         Articles are extracted only if:
@@ -408,5 +407,3 @@ class ArticleExtractor:
 
         pool.close()
         pool.join()
-
-        return self.parquet_files

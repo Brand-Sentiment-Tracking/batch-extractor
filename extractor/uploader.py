@@ -119,6 +119,8 @@ class ArticleToParquetS3:
             raise ValueError("Not all keys are strings.")
         elif any(map(lambda k: k not in self.FIELDS, keys)):
             raise ValueError("One of the keys doesn't exist.")
+        elif len(set(keys)) < len(keys):
+            raise ValueError("Cannot have duplicate keys.")
 
         self.__partitions = keys
 
