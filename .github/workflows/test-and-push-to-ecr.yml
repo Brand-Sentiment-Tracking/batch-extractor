@@ -47,12 +47,11 @@ jobs:
 
     - name: Run pytest within docker.
       id: docker-run-pytest
-      env:
-        KEY: ${{ secrets.EXTRACTOR_GITHUB_USER_KEY }}
-        SECRET: ${{ secrets.EXTRACTOR_GITHUB_USER_SECRET }}
       run: |
-        docker run --entrypoint=./test.sh -e AWS_ACCESS_KEY_ID=$KEY \
-          -e AWS_SECRET_ACCESS_KEY=$SECRET article-extractor:test
+        docker run --entrypoint=./test.sh \
+          -e AWS_ACCESS_KEY_ID=${{ secrets.EXTRACTOR_GITHUB_USER_KEY }} \
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.EXTRACTOR_GITHUB_USER_SECRET }} \
+          article-extractor:test
 
   deploy:
     name: Build and push image to AWS ECR.

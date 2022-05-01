@@ -25,7 +25,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         self.uploader = ArticleToParquetS3(self.bucket, 1000, processors=1,
                                            parquet_dir=self.parquets)
         return super().setUp()
-    
+
     def test_valid_bucket_name(self):
         self.uploader.bucket = "yet-another-bucket"
         self.assertEqual(self.uploader.bucket, "yet-another-bucket")
@@ -48,7 +48,7 @@ class TestArticleToParquetS3(unittest.TestCase):
 
         with self.assertRaises(ValueError) as a1:
             self.uploader.parquet_dir = 123
-        
+
         with self.assertRaises(ValueError) as a2:
             self.uploader.parquet_dir = filepath
 
@@ -65,7 +65,7 @@ class TestArticleToParquetS3(unittest.TestCase):
     def test_invalid_max_records(self):
         with self.assertRaises(ValueError) as a1:
             self.uploader.max_records = "Not too many records pls"
-        
+
         with self.assertRaises(ValueError) as a2:
             self.uploader.max_records = -1
 
@@ -78,13 +78,13 @@ class TestArticleToParquetS3(unittest.TestCase):
     def test_valid_partitions(self):
         new_partitions = ("title", "source_domain")
         self.uploader.partitions = new_partitions
-        
+
         self.assertEqual(self.uploader.partitions, new_partitions)
 
     def test_invalid_partitions_bad_types(self):
         with self.assertRaises(ValueError) as a1:
             self.uploader.partitions = "source_domain"
-        
+
         with self.assertRaises(ValueError) as a2:
             self.uploader.partitions = (123, "title")
 
@@ -97,7 +97,7 @@ class TestArticleToParquetS3(unittest.TestCase):
     def test_invalid_partitions_missing_or_duplicate_keys(self):
         with self.assertRaises(ValueError) as a1:
             self.uploader.partitions = ("url", "elon bought twitter")
-        
+
         with self.assertRaises(ValueError) as a2:
             self.uploader.partitions = ("title", "title", "date_crawled")
 
@@ -116,6 +116,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         start_date = datetime(2021, 1, 2, 6, 0, 0)
 
         self.uploader.run(["*"], start_date, end_date, 25)
+
 
 if __name__ == "__main__":
     unittest.main()

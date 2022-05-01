@@ -19,7 +19,7 @@ class TestArticleExtractor(unittest.TestCase):
         self.test_parquets = f"{self.resources}/test-parquets"
 
         self.extractor = None
-    
+
     def setUp(self):
         self.extractor = ArticleExtractor(self.parquets, 1)
 
@@ -36,7 +36,7 @@ class TestArticleExtractor(unittest.TestCase):
 
         with self.assertRaises(ValueError) as a1:
             self.extractor.parquet_dir = 123
-        
+
         with self.assertRaises(ValueError) as a2:
             self.extractor.parquet_dir = filepath
 
@@ -56,13 +56,13 @@ class TestArticleExtractor(unittest.TestCase):
     def test_invalid_processors(self):
         with self.assertRaises(ValueError) as a1:
             self.extractor.processors = "I would like some CPUs plz"
-        
+
         with self.assertRaises(ValueError) as a2:
             self.extractor.processors = -1
 
         with self.assertRaises(ValueError) as a3:
             self.extractor.processors = os.cpu_count() + 1
-        
+
         e1 = str(a1.exception)
         e2 = str(a2.exception)
         e3 = str(a3.exception)
@@ -85,7 +85,7 @@ class TestArticleExtractor(unittest.TestCase):
 
         with self.assertRaises(ValueError) as a2:
             self.extractor.start_date = datetime.now()
-        
+
         e1 = str(a1.exception)
         e2 = str(a2.exception)
 
@@ -104,7 +104,7 @@ class TestArticleExtractor(unittest.TestCase):
 
         with self.assertRaises(ValueError) as a2:
             self.extractor.end_date = datetime.now() + timedelta(days=1)
-        
+
         e1 = str(a1.exception)
         e2 = str(a2.exception)
 
@@ -131,7 +131,7 @@ class TestArticleExtractor(unittest.TestCase):
 
         unknown_warc = "CC-NEWS/2021/01/CC-NEWS-xxxxxxxxxxxxxx-xxxxx.warc.gz"
         self.assertFalse(self.extractor.warc_is_within_date(unknown_warc))
-        
+
     def test_retrieve_warc_paths(self):
         filepath = f"{self.resources}/cc-news-warc-paths-01-2021.txt"
 
@@ -158,7 +158,7 @@ class TestArticleExtractor(unittest.TestCase):
         start_date = datetime(2021, 1, 2, 6, 0, 0)
 
         self.extractor.download_articles(["*"], start_date, end_date, 50)
-        
+
         parquet_files = self.extractor.parquet_files
         counters = self.extractor.counters
 
@@ -171,6 +171,7 @@ class TestArticleExtractor(unittest.TestCase):
         total_rows = df1.shape[0] + df2.shape[0]
 
         self.assertEqual(counters.get("extracted"), total_rows)
+
 
 if __name__ == "__main__":
     unittest.main()

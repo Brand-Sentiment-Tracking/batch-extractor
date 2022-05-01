@@ -25,13 +25,13 @@ class TestExtractionJob(unittest.TestCase):
         self.job = ExtractionJob("test-warc", ["*"],
                                  self.start_date,
                                  self.parquets)
-        
+
         return super().setUp()
 
     def test_valid_warc_url(self):
         url_string = "https://data.commoncrawl.org/crawl-data/" \
                      "CC-NEWS/2021/01/CC-NEWS-20210101235306-01431.warc.gz"
-        
+
         basename = "CC-NEWS-20210101235306-01431"
 
         self.job.warc_url = url_string
@@ -77,7 +77,7 @@ class TestExtractionJob(unittest.TestCase):
     def test_invalid_date_crawled(self):
         with self.assertRaises(ValueError) as a1:
             self.job.date_crawled = "Not a date"
-        
+
         with self.assertRaises(ValueError) as a2:
             self.job.date_crawled = datetime.now() + timedelta(days=1)
 
@@ -98,7 +98,7 @@ class TestExtractionJob(unittest.TestCase):
 
         with self.assertRaises(ValueError) as a1:
             self.job.parquet_dir = 123
-        
+
         with self.assertRaises(ValueError) as a2:
             self.job.parquet_dir = filepath
 
@@ -115,10 +115,10 @@ class TestExtractionJob(unittest.TestCase):
     def test_invalid_report_every(self):
         with self.assertRaises(ValueError) as a1:
             self.job.report_every = "Not a number"
-        
+
         with self.assertRaises(ValueError) as a2:
             self.job.report_every = 0
-        
+
         e1 = a1.exception
         e2 = a2.exception
 
@@ -132,7 +132,6 @@ class TestExtractionJob(unittest.TestCase):
         with open(path, "rb") as f:
             record = next(ArchiveIterator(f, arc2warc=True))
             self.assertFalse(self.job.is_valid_record(record))
-
 
     def test_is_valid_record_no_source_url(self):
         file = "records/test-invalid-response-no-source.warc"
@@ -191,7 +190,7 @@ class TestExtractionJob(unittest.TestCase):
         with open(path, "rb") as f:
             record = next(ArchiveIterator(f, arc2warc=True))
             html = record.content_stream().read().decode("utf-8")
-        
+
         article, language = self.job.extract_article(path, html)
 
         self.assertIsNotNone(article)
@@ -210,9 +209,9 @@ class TestExtractionJob(unittest.TestCase):
         with open(path, "rb") as f:
             record = next(ArchiveIterator(f, arc2warc=True))
             html = record.content_stream().read().decode("utf-8")
-        
+
         article, language = self.job.extract_article(path, html)
-        
+
         article.publish_date = None
         self.job.add_article(article, language)
 
@@ -225,7 +224,7 @@ class TestExtractionJob(unittest.TestCase):
         with open(path, "rb") as f:
             record = next(ArchiveIterator(f, arc2warc=True))
             html = record.content_stream().read().decode("utf-8")
-        
+
         article, language = self.job.extract_article(path, html)
         self.job.add_article(article, language)
 
@@ -234,15 +233,15 @@ class TestExtractionJob(unittest.TestCase):
     def test_save_to_parquet(self):
         file = "records/test-valid-response.warc"
         path = os.path.join(self.resources, file)
-        
+
         parquet = f"{self.parquets}/{self.job.basename}.parquet"
 
         with open(path, "rb") as f:
             record = next(ArchiveIterator(f, arc2warc=True))
             html = record.content_stream().read().decode("utf-8")
-        
+
         article, language = self.job.extract_article(path, html)
-        
+
         self.job.add_article(article, language)
         self.job.save_to_parquet()
 

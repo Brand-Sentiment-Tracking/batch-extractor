@@ -253,7 +253,7 @@ class ArticleExtractor:
 
         return crawl_date is not None \
             and crawl_date >= self.start_date \
-                and crawl_date < self.end_date
+            and crawl_date < self.end_date
 
     def __filter_warc_paths(self, filepaths: List[str]) -> List[str]:
         """Filters the list of warc filepaths to those crawled between the

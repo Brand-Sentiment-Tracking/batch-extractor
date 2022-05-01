@@ -42,7 +42,7 @@ class ExtractionJob:
             reporting the status of the extraction job.
     """
     CONTENT_RE = re.compile(r"^(?P<mime>[\w\/]+);\s?charset=(?P<charset>.*)$")
-    
+
     FIELDS = ("title", "main_text", "url", "source_domain",
               "date_publish", "date_crawled", "language")
 
@@ -52,7 +52,7 @@ class ExtractionJob:
                  report_every: int = 5000):
 
         self.warc_url = warc_url
-    
+
         self.logger = logging.getLogger(self.job_name)
         self.log_level = log_level
 
@@ -73,7 +73,7 @@ class ExtractionJob:
     def warc_url(self, url: str):
         if type(url) != str:
             raise ValueError("WARC URL is not a string.")
-        
+
         self.__warc_url = url
         self.__basename = os.path.basename(url).split(".")[0]
 
@@ -109,7 +109,7 @@ class ExtractionJob:
             raise ValueError("Date is not a datetime object.")
         elif date > datetime.now():
             raise ValueError("Date is in the future.")
-            
+
         self.__date_crawled = date
 
     @property
@@ -238,7 +238,7 @@ class ExtractionJob:
         percent_remaining = 100 - percent_complete
 
         minutes_left = minutes * percent_remaining / percent_complete
-        
+
         self.logger.info(f"Extraction {percent_complete:.2f}% complete. "
                          f"~{minutes_left:.0f} mins left.")
 
@@ -260,7 +260,7 @@ class ExtractionJob:
         if record.rec_type != "response" \
             or record.rec_headers is None \
                 or record.http_headers is None:
-            
+
             return False
 
         source = record.rec_headers.get_header("WARC-Target-URI")
@@ -324,7 +324,7 @@ class ExtractionJob:
         except Exception:
             self.logger.debug(f"Parser raised exception:\n{format_exc()}")
             return None, None
-        
+
         return article, language
 
     def parse_records(self, warc: HTTPResponse, file_size: Optional[int],
@@ -393,12 +393,12 @@ class ExtractionJob:
             warc_path (str): The route of the warc file to be downloaded (not
                 including the CommonCrawl domain).
         """
-        self.logger.info(f"Downloading WARC file.")
+        self.logger.info("Downloading WARC file.")
         response = requests.get(self.warc_url, stream=True)
 
         if response.ok:
             file_size_string = response.headers.get("Content-Length")
-            
+
             file_size = int(file_size_string) \
                 if file_size_string is not None \
                 else None
