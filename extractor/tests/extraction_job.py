@@ -1,5 +1,4 @@
 import os
-import logging
 import unittest
 import pandas as pd
 
@@ -20,8 +19,9 @@ class TestExtractionJob(unittest.TestCase):
         self.parquets = os.path.join(self.resources, "parquets")
         self.test_parquets = os.path.join(self.resources, "test-parquets")
 
-    def setUp(self) -> None:
-        self.job = ExtractionJob("test-warc", ["*"], self.start_date,
+    def setUp(self):
+        self.job = ExtractionJob("test-warc", ["*"],
+                                 self.start_date,
                                  self.parquets)
         
         return super().setUp()
@@ -122,8 +122,6 @@ class TestExtractionJob(unittest.TestCase):
 
         self.assertEqual(str(e1), "Report Every is not an integer.")
         self.assertEqual(str(e2), "Report Every must be greater than zero.")
-
-    """Testing ExtractionJob public methods."""
 
     def test_is_valid_record_not_response(self):
         file = "test-request.warc"
@@ -234,21 +232,19 @@ class TestExtractionJob(unittest.TestCase):
     def test_save_to_parquet(self):
         file = "test-valid-response.warc"
         path = os.path.join(self.resources, file)
+        
+        parquet = f"{self.parquets}/{self.job.basename}.parquet"
 
         with open(path, "rb") as f:
             record = next(ArchiveIterator(f, arc2warc=True))
             html = record.content_stream().read().decode("utf-8")
         
         article, language = self.job.extract_article(path, html)
+        
         self.job.add_article(article, language)
-
-        self.assertIsNotNone(self.job.articles[0].get("date_publish"))
-
         self.job.save_to_parquet()
 
-        filepath = f"{self.parquets}/{self.job.basename}.parquet"
-
-        df = pd.read_parquet(filepath)
+        df = pd.read_parquet(parquet)
 
         publish_date = article.publish_date.strftime("%Y-%m-%d")
         crawled_date = self.job.date_crawled.strftime("%Y-%m-%d")
@@ -261,25 +257,23 @@ class TestExtractionJob(unittest.TestCase):
         self.assertEqual(df.date_crawled.values[0], crawled_date)
         self.assertEqual(df.language.values[0], language)
 
-
     def test_extract_warc(self):
         url_string = "https://data.commoncrawl.org/crawl-data/" \
                      "CC-NEWS/2021/01/CC-NEWS-20210101235306-01431.warc.gz"
 
         self.job.warc_url = url_string
+        parquet = f"{self.parquets}/{self.job.basename}.parquet"
 
-        self.job.extract_warc(limit=50)
-        self.job.report_counters()
+        self.job.extract_warc(limit=20)
+
+        self.assertTrue(os.path.isfile(parquet))
+        df = pd.read_parquet(parquet)
 
         self.assertGreater(self.job.extracted, 0)
-        self.assertGreater(0.1 * self.job.extracted, self.job.errored)
-
-        filepath = f"{self.parquets}/{self.job.basename}.parquet"
-
-        self.assertTrue(os.path.isfile(filepath))
-        df = pd.read_parquet(filepath)
-
         self.assertEqual(self.job.extracted, df.shape[0])
+
+        # Check that less that extracted is 10x the size of errored
+        self.assertGreater(0.1 * self.job.extracted, self.job.errored)
 
 
 if __name__ == "__main__":
