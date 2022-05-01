@@ -26,7 +26,7 @@ class ArticleExtractor:
         parquet_dir (str): The path to the local directory for storing
             parquet files after extraction. The directory will automatically
             be created if it doesn't already exist.
-        processes (int): The number of parallel processes to run when
+        processors (int): The number of parallel processors to run when
             extracting articles. If `None`, then the number of CPUs available
             is used.
     """
@@ -36,7 +36,7 @@ class ArticleExtractor:
 
     WARC_FILE_RE = re.compile(r"CC-NEWS-(?P<time>\d{14})-(?P<serial>\d{5})")
 
-    def __init__(self, parquet_dir: str, processes: Optional[int] = None,
+    def __init__(self, parquet_dir: str, processors: Optional[int] = None,
                  log_level: int = logging.INFO):
 
         self.log_level = log_level
@@ -45,7 +45,7 @@ class ArticleExtractor:
         self.logger.setLevel(self.log_level)
 
         self.parquet_dir = parquet_dir
-        self.processes = processes
+        self.processors = processors
 
         self.__start_date = None
         self.__end_date = None
@@ -77,7 +77,7 @@ class ArticleExtractor:
         self.__parquet_dir = path
 
     @property
-    def processes(self) -> int:
+    def processors(self) -> int:
         """`int`: The number of CPU processors to run in parallel.
 
         If set as `None`, the number of CPU processors available will be used
@@ -88,20 +88,20 @@ class ArticleExtractor:
         """
         return self.__processes
 
-    @processes.setter
-    def processes(self, processes: Optional[int]):
-        if processes is None:
+    @processors.setter
+    def processors(self, n: Optional[int]):
+        if n is None:
             self.__processes = os.cpu_count()
-            self.logger.info(f"Setting pool processes to {self.processes}.")
+            self.logger.info(f"Setting pool processors to {self.processors}.")
             return
 
-        if type(processes) != int:
-            raise ValueError("Pool processes is not an integer.")
-        elif processes > os.cpu_count():
-            raise ValueError(f"{processes} processes is greater than the "
-                             "number of CPUs available.")
+        if type(n) != int or n <= 0:
+            raise ValueError("Processors is not an integer greater than 0.")
+        elif n > os.cpu_count():
+            raise ValueError(f"{n} processors is greater than the number of"
+                             " CPUs available.")
 
-        self.__processes = processes
+        self.__processes = n
 
     @property
     def start_date(self) -> datetime:
@@ -223,14 +223,13 @@ class ArticleExtractor:
         match = self.WARC_FILE_RE.search(warc_filepath)
 
         if match is None:
-            self.logger.debug(f"Ignoring '{warc_filepath}'.")
-            return False
+            return None
 
         time = match.group("time")
 
         return datetime.strptime(time, "%Y%m%d%H%M%S")
 
-    def __is_within_date(self, warc_filepath: str) -> bool:
+    def warc_is_within_date(self, warc_filepath: str) -> bool:
         """Checks whether a warc was crawled between the start and end dates.
 
         This is done by extracting the timetamp from the filename, parsing
@@ -252,8 +251,9 @@ class ArticleExtractor:
         """
         crawl_date = self.__extract_date(warc_filepath)
 
-        return crawl_date >= self.start_date \
-            and crawl_date < self.end_date
+        return crawl_date is not None \
+            and crawl_date >= self.start_date \
+                and crawl_date < self.end_date
 
     def __filter_warc_paths(self, filepaths: List[str]) -> List[str]:
         """Filters the list of warc filepaths to those crawled between the
@@ -269,7 +269,7 @@ class ArticleExtractor:
         Returns:
             List[str]: The filtered list of warc filepaths.
         """
-        return list(filter(self.__is_within_date, filepaths))
+        return list(filter(self.warc_is_within_date, filepaths))
 
     def retrieve_warc_paths(self, start_date: datetime,
                             end_date: datetime) -> List[str]:
@@ -303,6 +303,7 @@ class ArticleExtractor:
     @staticmethod
     def run_extraction_job(warc_url: str, patterns: List[str],
                            date_crawled: datetime, parquet_dir: str,
+                           limit: Optional[int],
                            log_level: int) -> Tuple[str, Dict[str, int]]:
         """Extract all the articles from a WARC and save to a parquet file.
 
@@ -327,7 +328,7 @@ class ArticleExtractor:
         job = ExtractionJob(warc_url, patterns, date_crawled,
                             parquet_dir, log_level)
 
-        job.extract_warc()
+        job.extract_warc(limit=limit)
 
         return job.filepath, job.counters
 
@@ -357,7 +358,8 @@ class ArticleExtractor:
         """The process callback for a failed job. Simply logs the error."""
         self.logger.error(f"Process exited with error:\n\t{repr(error)}")
 
-    def __submit_job(self, pool: Pool, warc_path: str, patterns: List[str]):
+    def __submit_job(self, pool: Pool, warc_path: str, patterns: List[str],
+                     limit: Optional[int] = None):
         """Submit an extraction job to the process pool.
 
         Args:
@@ -371,14 +373,14 @@ class ArticleExtractor:
         date_crawled = self.__extract_date(warc_path)
 
         args = (warc_url, patterns, date_crawled,
-                self.parquet_dir, self.log_level)
+                self.parquet_dir, limit, self.log_level)
 
         pool.apply_async(self.run_extraction_job, args,
                          callback=self.__on_job_success,
                          error_callback=self.__on_job_error)
 
     def download_articles(self, patterns: List[str], start_date: datetime,
-                          end_date: datetime) -> List[str]:
+                          end_date: datetime, limit: Optional[int] = None) -> List[str]:
         """Downloads and extracts articles from CC-NEWS.
 
         Articles are extracted only if:
@@ -398,10 +400,10 @@ class ArticleExtractor:
         warc_paths = self.retrieve_warc_paths(start_date, end_date)
         self.logger.info(f"Found {len(warc_paths)} WARC files to process.")
 
-        pool = multiprocessing.Pool(processes=self.processes)
+        pool = multiprocessing.Pool(processes=self.processors)
 
         for warc in warc_paths:
-            self.__submit_job(pool, warc, patterns)
+            self.__submit_job(pool, warc, patterns, limit)
 
         pool.close()
         pool.join()

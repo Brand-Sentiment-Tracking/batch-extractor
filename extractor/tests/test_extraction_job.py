@@ -19,6 +19,8 @@ class TestExtractionJob(unittest.TestCase):
         self.parquets = os.path.join(self.resources, "parquets")
         self.test_parquets = os.path.join(self.resources, "test-parquets")
 
+        self.job = None
+
     def setUp(self):
         self.job = ExtractionJob("test-warc", ["*"],
                                  self.start_date,
