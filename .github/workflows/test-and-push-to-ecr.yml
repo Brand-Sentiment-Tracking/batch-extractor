@@ -1,25 +1,85 @@
-name: Lint, test and push Batch Extractor to AWS ECR.
+name: Test and deploy Article Extractor to AWS ECR.
 
-on: [push]
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
 
 jobs:
   lint:
-    name: Lint Batch Extractor with flake8
+    name: Lint Article Extractor
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.8"]
     steps:
+
     - uses: actions/checkout@v3
+
     - name: Set up Python ${{ matrix.python-version }}
+      id: setup-python
       uses: actions/setup-python@v3
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
+      id: install-flake8
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r requirements.txt
         python -m pip install flake8
     - name: Analysing the code with pylint
+      id: run-flake8
       run: |
         python -m flake8 extractor
+
+  test:
+    name: Build and test Article Extractor image.
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: actions/checkout@v3
+
+    - name: Build docker image.
+      id: build-image
+      run: |
+        docker build -t article-extractor:test .
+
+    - name: Run pytest within docker.
+      id: docker-run-pytest
+      env:
+        KEY: ${{ secrets.EXTRACTOR_GITHUB_USER_KEY }}
+        SECRET: ${{ secrets.EXTRACTOR_GITHUB_USER_SECRET }}
+      run: |
+        docker run --entrypoint=./test.sh -e AWS_ACCESS_KEY_ID=$KEY \
+          -e AWS_SECRET_ACCESS_KEY=$SECRET article-extractor:test
+
+  deploy:
+    name: Build and push image to AWS ECR.
+    runs-on: ubtuntu-latest
+    needs: test
+    steps:
+
+    - uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      id: configure-aws
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.EXTRACTOR_GITHUB_USER_KEY }}
+        aws-secret-access-key: ${{ secrets.EXTRACTOR_GITHUB_USER_SECRET }}
+        aws-region: us-east-1
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag, and push image to Amazon ECR.
+      id: build-image
+      env:
+        ECR_REGISTRY: 357883163469.dkr.ecr.us-east-1.amazonaws.com
+        ECR_REPOSITORY: multiprocessing-batch-extractor
+        IMAGE_TAG: latest
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
