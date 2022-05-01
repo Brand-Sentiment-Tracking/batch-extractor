@@ -52,9 +52,9 @@ class ExtractionJob:
                  report_every: int = 5000):
 
         self.warc_url = warc_url
-
+    
         self.logger = logging.getLogger(self.job_name)
-        self.logger.setLevel(log_level)
+        self.log_level = log_level
 
         self.patterns = patterns
         self.date_crawled = date_crawled
@@ -133,6 +133,15 @@ class ExtractionJob:
             raise ValueError(f"'{path}' is not a directory.")
 
         self.__parquet_dir = path
+
+    @property
+    def log_level(self) -> int:
+        return self.__log_level
+
+    @log_level.setter
+    def log_level(self, level: int):
+        self.__log_level = level
+        self.logger.setLevel(level)
 
     @property
     def report_every(self) -> int:
@@ -342,6 +351,8 @@ class ExtractionJob:
                 self.report_progress(start_time, records.offset, file_size)
             elif limit is not None and i > limit:
                 self.logger.info("Passed limit. Stopping.")
+                warc.close()
+                break
 
             url = record.rec_headers.get_header("WARC-Target-URI")
 

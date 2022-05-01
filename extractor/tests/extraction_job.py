@@ -1,4 +1,5 @@
 import os
+import logging
 import unittest
 import pandas as pd
 
@@ -267,7 +268,7 @@ class TestExtractionJob(unittest.TestCase):
 
         self.job.warc_url = url_string
 
-        self.job.extract_warc(limit=100)
+        self.job.extract_warc(limit=50)
         self.job.report_counters()
 
         self.assertGreater(self.job.extracted, 0)
