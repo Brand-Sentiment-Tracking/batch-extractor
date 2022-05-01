@@ -140,9 +140,10 @@ class ArticleToParquetS3:
         self.logger.info(f"'{basename}' push successful.")
 
     def run(self, patterns: List[str], start_date: datetime,
-            end_date: datetime):
+            end_date: datetime, limit: Optional[int] = None):
 
-        self.extractor.download_articles(patterns, start_date, end_date)
+        self.extractor.download_articles(patterns, start_date,
+                                         end_date, limit)
 
         if not self.extractor.parquet_files:
             self.logger.error("No parquet files were found.")

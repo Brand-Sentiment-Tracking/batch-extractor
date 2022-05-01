@@ -349,7 +349,7 @@ class ExtractionJob:
             if i != 0 and i % self.report_every == 0:
                 self.report_counters()
                 self.report_progress(start_time, records.offset, file_size)
-            elif limit is not None and i > limit:
+            elif limit is not None and i >= limit:
                 self.logger.info("Passed limit. Stopping.")
                 warc.close()
                 break

@@ -47,8 +47,8 @@ class ArticleExtractor:
         self.parquet_dir = parquet_dir
         self.processors = processors
 
-        self.__start_date = None
-        self.__end_date = None
+        self.__start_date = datetime.now()
+        self.__end_date = datetime.now()
 
         self.reset_counters()
 
@@ -134,7 +134,7 @@ class ArticleExtractor:
     def end_date(self, end_date: datetime):
         if type(end_date) != datetime:
             raise ValueError("End date isn't type 'datetime'.")
-        elif end_date >= datetime.now():
+        elif end_date > datetime.now():
             raise ValueError("End date is in the future.")
 
         self.__end_date = end_date
@@ -380,7 +380,8 @@ class ArticleExtractor:
                          error_callback=self.__on_job_error)
 
     def download_articles(self, patterns: List[str], start_date: datetime,
-                          end_date: datetime, limit: Optional[int] = None) -> List[str]:
+                          end_date: datetime,
+                          limit: Optional[int] = None) -> List[str]:
         """Downloads and extracts articles from CC-NEWS.
 
         Articles are extracted only if:
