@@ -52,15 +52,16 @@ class ExtractionJob:
                  report_every: int = 5000):
 
         self.warc_url = warc_url
+
+        self.logger = logging.getLogger(self.job_name)
+        self.logger.setLevel(log_level)
+
         self.patterns = patterns
         self.date_crawled = date_crawled
         self.parquet_dir = parquet_dir
         self.report_every = report_every
 
         self.articles = list()
-
-        self.logger = logging.getLogger(self.job_name)
-        self.logger.setLevel(log_level)
 
         self.reset_counters()
 
@@ -92,6 +93,9 @@ class ExtractionJob:
             raise ValueError("URL patterns is not a list.")
         elif any(map(lambda x: type(x) != str, patterns)):
             raise ValueError("Not all URL patterns are strings.")
+        elif not patterns:
+            self.logger.warning("Empty patterns list. All source "
+                                "URLs will be rejected.")
 
         self.__patterns = patterns
 
@@ -99,6 +103,7 @@ class ExtractionJob:
     def date_crawled(self):
         return self.__date_crawled
 
+    @date_crawled.setter
     def date_crawled(self, date: datetime):
         if type(date) != datetime:
             raise ValueError("Date is not a datetime object.")
@@ -228,7 +233,7 @@ class ExtractionJob:
         self.logger.info(f"Extraction {percent_complete:.2f}% complete. "
                          f"~{minutes_left:.0f} mins left.")
 
-    def __is_valid_record(self, record: ArcWarcRecord) -> bool:
+    def is_valid_record(self, record: ArcWarcRecord) -> bool:
         """Checks whether a warc record should be extracted to an article.
 
         This is done by checking:
@@ -243,23 +248,26 @@ class ExtractionJob:
             bool: True if the record is valid and should be extracted to an
                 article. False otherwise.
         """
-        if record.rec_type != "response":
+        if record.rec_type != "response" \
+            or record.rec_headers is None \
+                or record.http_headers is None:
+            
             return False
 
-        source_url = record.rec_headers.get_header("WARC-Target-URI")
-        content_string = record.http_headers.get_header('Content-Type')
+        source = record.rec_headers.get_header("WARC-Target-URI")
+        content = record.http_headers.get_header('Content-Type')
 
-        if source_url is None or content_string is None:
+        if source is None or content is None:
             return False
 
-        content = self.CONTENT_RE.match(content_string)
+        content = self.CONTENT_RE.match(content)
 
         if content is None or content.group("mime") != "text/html" \
                 or content.group("charset").lower() != "utf-8":
 
             return False
 
-        return any(map(lambda url: fnmatch(source_url, url), self.patterns))
+        return any(map(lambda url: fnmatch(source, url), self.patterns))
 
     def add_article(self, article: Article, language: str):
         try:
@@ -303,21 +311,19 @@ class ExtractionJob:
             else:
                 language = langdetect.detect(article.title)
 
-            self.__extracted += 1
-
         # Blanket error catch here. Should be made more specific.
         except Exception:
             self.logger.debug(f"Parser raised exception:\n{format_exc()}")
-            self.__errored += 1
-            return
+            return None, None
+        
+        return article, language
 
-        self.add_article(article, language)
-
-    def __parse_records(self, warc: HTTPResponse, file_size: Optional[int]):
+    def parse_records(self, warc: HTTPResponse, file_size: Optional[int],
+                      limit: Optional[int] = None):
         """Iterate through articles from a warc file.
 
         Each record is loaded using warcio, and extracted if:
-        - It is a valid news article (see __is_valid_record)
+        - It is a valid news article (see is_valid_record)
         - Its source URL matches one of the patterns.
         - The detected language is supported by newspaper.
 
@@ -334,10 +340,12 @@ class ExtractionJob:
             if i != 0 and i % self.report_every == 0:
                 self.report_counters()
                 self.report_progress(start_time, records.offset, file_size)
+            elif limit is not None and i > limit:
+                self.logger.info("Passed limit. Stopping.")
 
             url = record.rec_headers.get_header("WARC-Target-URI")
 
-            if not self.__is_valid_record(record):
+            if not self.is_valid_record(record):
                 self.logger.debug(f"Ignoring '{url}'")
                 self.__discarded += 1
                 continue
@@ -349,7 +357,13 @@ class ExtractionJob:
                 self.__errored += 1
                 continue
 
-            self.extract_article(url, html)
+            article, language = self.extract_article(url, html)
+
+            if article is not None:
+                self.add_article(article, language)
+                self.__extracted += 1
+            else:
+                self.__errored += 1
 
     def save_to_parquet(self):
         self.logger.info(f"Saving to '{self.filepath}'")
@@ -357,7 +371,7 @@ class ExtractionJob:
 
         parquet.write_table(table, self.filepath, flavor="spark")
 
-    def extract_warc(self):
+    def extract_warc(self, limit: Optional[int] = None):
         """Downloads and parses a warc file for article extraction.
 
         Note:
@@ -378,9 +392,9 @@ class ExtractionJob:
                 if file_size_string is not None \
                 else None
 
-            self.__parse_records(response.raw, file_size)
+            self.parse_records(response.raw, file_size, limit)
         else:
-            self.logger.warn(f"Failed to download '{self.basename}' "
-                             f"(status code {response.status_code}).")
+            self.logger.warning(f"Failed to download '{self.basename}' "
+                                f"(status code {response.status_code}).")
 
         self.save_to_parquet()

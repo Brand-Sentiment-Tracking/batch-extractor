@@ -1,5 +1,14 @@
-articles/
+# Ignore all test files
+extractor/tests/resources/*
 
+# Ignore parquet files
+parquet-dir/*
+test-parquet-dir/*
+
+# Ignore all caching
+__pycache__
+
+# Ignore random config files
 .vscode/
 .DS_Store
 .python-version
