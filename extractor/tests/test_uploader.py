@@ -115,7 +115,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         end_date = datetime(2021, 1, 2, 9, 0, 0)
         start_date = datetime(2021, 1, 2, 6, 0, 0)
 
-        self.uploader.run(["*"], start_date, end_date, 50)
+        self.uploader.run(["*"], start_date, end_date, 25)
 
 if __name__ == "__main__":
     unittest.main()

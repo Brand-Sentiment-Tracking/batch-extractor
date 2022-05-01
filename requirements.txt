@@ -1,9 +1,13 @@
-# Date parsing
-python-dateutil
 # Article Extraction
 warcio
 newspaper3k
 langdetect
+
 # Parquet Writing
 pyarrow
 pyspark
+
+# Unit testing in pipeline
+pytest
+hypothesis
+pandas
