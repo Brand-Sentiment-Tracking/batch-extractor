@@ -1,9 +1,6 @@
-# Ignore all test files
-extractor/tests/resources/*
-
-# Ignore parquet files
-parquet-dir/*
-test-parquet-dir/*
+# Ignore test results
+extractor/tests/resources/parquets/*
+extractor/tests/resources/test-parquets/*
 
 # Ignore all caching
 __pycache__

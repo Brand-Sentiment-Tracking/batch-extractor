@@ -1,0 +1,17 @@
+WARC/1.0
+WARC-Type: request
+WARC-IP-Address: 104.70.188.36
+WARC-Record-ID: <urn:uuid:0db5d2f7-1a7e-4102-acae-b487a13034ca>
+Content-Length: 408
+WARC-Date: 2022-04-01T13:51:23Z
+WARC-Target-URI: https://hindi.news18.com/news/bihar/patna-kc-tyagi-said-cm-nitish-kumar-is-not-going-to-rajya-sabha-these-discussions-are-rumours-nodaa-4167527.html
+Content-Type: application/http; msgtype=request
+WARC-Block-Digest: sha1:ZGKPE6PJ4E6TFOSIX5ZDE7WATQEA6ATB
+
+GET /news/bihar/patna-kc-tyagi-said-cm-nitish-kumar-is-not-going-to-rajya-sabha-these-discussions-are-rumours-nodaa-4167527.html HTTP/1.1
+User-Agent: CCBot/3.0 (https://commoncrawl.org/faq/; info@commoncrawl.org)
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8
+Accept-Language: en-us,en-gb,en;q=0.7,*;q=0.3
+Host: hindi.news18.com
+Connection: Keep-Alive
+Accept-Encoding: gzip
