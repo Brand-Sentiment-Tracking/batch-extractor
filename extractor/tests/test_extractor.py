@@ -47,8 +47,8 @@ class TestArticleExtractor(unittest.TestCase):
         self.assertEqual(e2, f"'{filepath}' is not a directory.")
 
     def test_valid_processors(self):
-        self.extractor.processors = 4
-        self.assertEqual(self.extractor.processors, 4)
+        self.extractor.processors = os.cpu_count()
+        self.assertEqual(self.extractor.processors, os.cpu_count())
 
         self.extractor.processors = None
         self.assertEqual(self.extractor.processors, os.cpu_count())
