@@ -67,7 +67,7 @@ class ArticleExtractor:
     @parquet_dir.setter
     def parquet_dir(self, path):
         if type(path) != str:
-            raise ValueError("Path is not a string.")
+            raise TypeError("Path is not a string.")
         elif not os.path.exists(path):
             self.logger.debug(f"Creating directory '{path}'.")
             os.makedirs(path, exist_ok=True)
@@ -95,11 +95,11 @@ class ArticleExtractor:
             self.logger.info(f"Setting pool processors to {self.processors}.")
             return
 
-        if type(n) != int or n <= 0:
-            raise ValueError("Processors is not an integer greater than 0.")
-        elif n > os.cpu_count():
-            raise ValueError(f"{n} processors is greater than the number of"
-                             " CPUs available.")
+        if type(n) != int:
+            raise TypeError("Processors is not an integer.")
+        elif n <= 0 or n > os.cpu_count():
+            raise ValueError(f"{n} processors is less than 1 or greater"
+                             " than the number of CPUs available.")
 
         self.__processes = n
 
@@ -115,7 +115,7 @@ class ArticleExtractor:
     @start_date.setter
     def start_date(self, start_date: datetime):
         if type(start_date) != datetime:
-            raise ValueError("Start date isn't type 'datetime'.")
+            raise TypeError("Start date isn't type 'datetime'.")
         elif start_date >= self.end_date:
             raise ValueError("Start date is on or after the end date.")
 
@@ -133,7 +133,7 @@ class ArticleExtractor:
     @end_date.setter
     def end_date(self, end_date: datetime):
         if type(end_date) != datetime:
-            raise ValueError("End date isn't type 'datetime'.")
+            raise TypeError("End date isn't type 'datetime'.")
         elif end_date > datetime.now():
             raise ValueError("End date is in the future.")
 

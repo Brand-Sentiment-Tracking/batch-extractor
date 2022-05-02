@@ -64,7 +64,7 @@ class ArticleToParquetS3:
     @bucket.setter
     def bucket(self, name: str):
         if type(name) != str:
-            raise ValueError("Bucket name is not a string.")
+            raise TypeError("Bucket name is not a string.")
 
         self.__bucket = name
 
@@ -75,7 +75,7 @@ class ArticleToParquetS3:
     @parquet_dir.setter
     def parquet_dir(self, path):
         if type(path) != str:
-            raise ValueError("Path is not a string.")
+            raise TypeError("Path is not a string.")
         elif not os.path.exists(path):
             self.logger.debug(f"Creating directory '{path}'.")
             os.makedirs(path, exist_ok=True)
@@ -96,7 +96,7 @@ class ArticleToParquetS3:
     @max_records.setter
     def max_records(self, n: int):
         if type(n) != int:
-            raise ValueError("Max records is not an integer.")
+            raise TypeError("Max records is not an integer.")
         elif n <= 0:
             raise ValueError("Max records must be greater than 0.")
 
@@ -114,7 +114,9 @@ class ArticleToParquetS3:
     @partitions.setter
     def partitions(self, keys: Tuple[str]):
         if type(keys) != tuple or len(keys) == 0:
-            raise ValueError("Partition keys is not a tuple or is empty.")
+            raise TypeError("Partition keys is not a tuple.")
+        elif len(keys) == 0:
+            raise ValueError("Partition keys is empty.")
         elif any(map(lambda k: type(k) != str, keys)):
             raise ValueError("Not all keys are strings.")
         elif any(map(lambda k: k not in self.FIELDS, keys)):

@@ -72,7 +72,7 @@ class ExtractionJob:
     @warc_url.setter
     def warc_url(self, url: str):
         if type(url) != str:
-            raise ValueError("WARC URL is not a string.")
+            raise TypeError("WARC URL is not a string.")
 
         self.__warc_url = url
         self.__basename = os.path.basename(url).split(".")[0]
@@ -90,7 +90,7 @@ class ExtractionJob:
     @patterns.setter
     def patterns(self, patterns: List[str]):
         if type(patterns) != list:
-            raise ValueError("URL patterns is not a list.")
+            raise TypeError("URL patterns is not a list.")
         elif any(map(lambda x: type(x) != str, patterns)):
             raise ValueError("Not all URL patterns are strings.")
         elif not patterns:
@@ -106,7 +106,7 @@ class ExtractionJob:
     @date_crawled.setter
     def date_crawled(self, date: datetime):
         if type(date) != datetime:
-            raise ValueError("Date is not a datetime object.")
+            raise TypeError("Date is not a datetime object.")
         elif date > datetime.now():
             raise ValueError("Date is in the future.")
 
@@ -125,7 +125,7 @@ class ExtractionJob:
     @parquet_dir.setter
     def parquet_dir(self, path: str):
         if type(path) != str:
-            raise ValueError("Path is not a string.")
+            raise TypeError("Path is not a string.")
         elif not os.path.exists(path):
             self.logger.debug(f"Creating directory '{path}'.")
             os.makedirs(path, exist_ok=True)
@@ -150,7 +150,7 @@ class ExtractionJob:
     @report_every.setter
     def report_every(self, n: int):
         if type(n) != int:
-            raise ValueError("Report Every is not an integer.")
+            raise TypeError("Report Every is not an integer.")
         elif n <= 0:
             raise ValueError("Report Every must be greater than zero.")
 

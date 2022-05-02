@@ -34,7 +34,7 @@ class TestArticleExtractor(unittest.TestCase):
     def test_invalid_parquet_directory(self):
         filepath = f"{self.resources}/placeholder.txt"
 
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.extractor.parquet_dir = 123
 
         with self.assertRaises(ValueError) as a2:
@@ -54,7 +54,7 @@ class TestArticleExtractor(unittest.TestCase):
         self.assertEqual(self.extractor.processors, os.cpu_count())
 
     def test_invalid_processors(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.extractor.processors = "I would like some CPUs plz"
 
         with self.assertRaises(ValueError) as a2:
@@ -68,17 +68,19 @@ class TestArticleExtractor(unittest.TestCase):
         e3 = str(a3.exception)
 
         self.assertEqual(e1, "Processors is not an integer greater than 0.")
-        self.assertEqual(e2, "Processors is not an integer greater than 0.")
+        
+        self.assertEqual(e2, "-1 processors is less than 1 or greater"
+                         " than the number of CPUs available.")
 
-        self.assertEqual(e3, f"{os.cpu_count() + 1} processors is greater "
-                         "than the number of CPUs available.")
+        self.assertEqual(e3, f"{os.cpu_count() + 1} processors is less than"
+                         " 1 or greater than the number of CPUs available.")
 
     def test_valid_start_date(self):
         self.extractor.start_date = datetime(2022, 4, 12)
         self.assertEqual(self.extractor.start_date, datetime(2022, 4, 12))
 
     def test_invalid_start_date(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.extractor.start_date = "2022-04-12"
 
         self.extractor.end_date = datetime(2022, 4, 12)
@@ -97,7 +99,7 @@ class TestArticleExtractor(unittest.TestCase):
         self.assertEqual(self.extractor.end_date, datetime(2022, 4, 12))
 
     def test_invalid_end_date(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.extractor.end_date = "2022-04-12"
 
         self.extractor.end_date = datetime(2022, 4, 12)

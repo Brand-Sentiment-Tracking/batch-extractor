@@ -14,7 +14,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         self.start_date = datetime.now()
         self.resources = "./extractor/tests/resources"
 
-        self.bucket = "brand-sentiment-unit-testing/uploading"
+        self.bucket = "brand-sentiment-unit-testing/ext/uploading"
 
         self.parquets = f"{self.resources}/parquets"
         self.test_parquets = f"{self.resources}/test-parquets"
@@ -31,7 +31,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         self.assertEqual(self.uploader.bucket, "yet-another-bucket")
 
     def test_invalid_bucket_name(self):
-        with self.assertRaises(ValueError) as a:
+        with self.assertRaises(TypeError) as a:
             self.uploader.bucket = 123
 
         e = str(a.exception)
@@ -46,7 +46,7 @@ class TestArticleToParquetS3(unittest.TestCase):
     def test_invalid_parquet_directory(self):
         filepath = f"{self.resources}/placeholder.txt"
 
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.uploader.parquet_dir = 123
 
         with self.assertRaises(ValueError) as a2:
@@ -63,7 +63,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         self.assertEqual(self.uploader.max_records, 50)
 
     def test_invalid_max_records(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.uploader.max_records = "Not too many records pls"
 
         with self.assertRaises(ValueError) as a2:
@@ -82,7 +82,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         self.assertEqual(self.uploader.partitions, new_partitions)
 
     def test_invalid_partitions_bad_types(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.uploader.partitions = "source_domain"
 
         with self.assertRaises(ValueError) as a2:

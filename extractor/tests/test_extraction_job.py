@@ -44,7 +44,7 @@ class TestExtractionJob(unittest.TestCase):
         random_args = [None, 1, True, list(), dict()]
 
         for arg in random_args:
-            with self.assertRaises(ValueError) as a:
+            with self.assertRaises(TypeError) as a:
                 self.job.warc_url = arg
 
             self.assertEqual(str(a.exception), "WARC URL is not a string.")
@@ -56,7 +56,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertEqual(self.job.patterns, example_patterns)
 
     def test_invalid_url_patterns(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.job.patterns = "Hello World!"
 
         with self.assertRaises(ValueError) as a2:
@@ -75,7 +75,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertEqual(self.job.date_crawled, new_date)
 
     def test_invalid_date_crawled(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.job.date_crawled = "Not a date"
 
         with self.assertRaises(ValueError) as a2:
@@ -96,7 +96,7 @@ class TestExtractionJob(unittest.TestCase):
     def test_invalid_parquet_directory(self):
         filepath = f"{self.resources}/placeholder.txt"
 
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.job.parquet_dir = 123
 
         with self.assertRaises(ValueError) as a2:
@@ -113,7 +113,7 @@ class TestExtractionJob(unittest.TestCase):
         self.assertEqual(self.job.report_every, 50)
 
     def test_invalid_report_every(self):
-        with self.assertRaises(ValueError) as a1:
+        with self.assertRaises(TypeError) as a1:
             self.job.report_every = "Not a number"
 
         with self.assertRaises(ValueError) as a2:
