@@ -10,7 +10,7 @@ from pyarrow import parquet
 import os.path
 
 from traceback import format_exc
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
 from datetime import datetime
 
@@ -36,8 +36,8 @@ class ExtractionJob:
         patterns (List[str]): The glob patterns for filtering articles
             based off the source URL.
         date_crawled (datetime): The publish date/time of the WARC file.
-        log_level (logging._Level): The severity level of logs to be
-            reported, e.g., `DEBUG`, `INFO`, `WARN`, etc.
+        paruqet_dir (str): The local directory to save parquet files to.
+        log_level (_Level): The severity level of logs to be reported.
         report_every (int): The number of records to iterate through before
             reporting the status of the extraction job.
     """
@@ -67,6 +67,11 @@ class ExtractionJob:
 
     @property
     def warc_url(self) -> str:
+        """`str`: The full URL to download the WARC file from.
+
+        Once set, the parquet filename and extraction job name will be
+        based off the basename of the WARC file given by the URL.
+        """
         return self.__warc_url
 
     @warc_url.setter
@@ -81,9 +86,6 @@ class ExtractionJob:
     def patterns(self) -> List[str]:
         """`list` of `str` containing the url patterns to match the
         article URL against when filtering.
-
-        The setter method will throw a ValueError if the new patterns is not a
-        list of strings.
         """
         return self.__patterns
 
@@ -100,7 +102,8 @@ class ExtractionJob:
         self.__patterns = patterns
 
     @property
-    def date_crawled(self):
+    def date_crawled(self) -> datetime:
+        """`datetime`: The date when the WARC file was published."""
         return self.__date_crawled
 
     @date_crawled.setter
@@ -117,8 +120,8 @@ class ExtractionJob:
         """`str`: The path to the local directory for storing parquet files.
 
         When defining the path, the setter will automatically create it if it
-        doesn't exist. The setter will also raise a ValueError if the new path
-        is not a string, or if the path exists but is not a directory.
+        doesn't exist. The setter will also raise a ValueError if the path
+        exists but is not a directory.
         """
         return self.__parquet_dir
 
@@ -136,6 +139,7 @@ class ExtractionJob:
 
     @property
     def log_level(self) -> int:
+        """`_Level`: The logging level to print ExtractionJob logs for."""
         return self.__log_level
 
     @log_level.setter
@@ -145,6 +149,9 @@ class ExtractionJob:
 
     @property
     def report_every(self) -> int:
+        """`int`: The number of records to iterate over before logging job
+        counters and progress.
+        """
         return self.__report_every
 
     @report_every.setter
@@ -158,14 +165,17 @@ class ExtractionJob:
 
     @property
     def basename(self) -> str:
+        """`str`: The basename of the WARC URL without file extensions."""
         return self.__basename
 
     @property
     def job_name(self) -> str:
+        """`str`: The name of the Extraction job when logging."""
         return f"ExtractionJob({self.basename})"
 
     @property
     def filepath(self) -> str:
+        """`str`: The path to the parquet file to save articles to."""
         return os.path.join(self.parquet_dir, f"{self.basename}.parquet")
 
     @property
@@ -279,6 +289,12 @@ class ExtractionJob:
         return any(map(lambda url: fnmatch(source, url), self.patterns))
 
     def add_article(self, article: Article, language: str):
+        """Add the article to the list of saved articles as a dictionary.
+
+        Args:
+            article (Article): The extracted article.
+            language (str): The short-code of the article's language.
+        """
         try:
             date_publish = article.publish_date.strftime("%Y-%m-%d")
         except (ValueError, AttributeError):
@@ -296,18 +312,20 @@ class ExtractionJob:
             "language": language
         })
 
-    def extract_article(self, url: str, html: str):
+    def extract_article(self, url: str, html: str) -> Tuple[Article, str]:
         """Extracts the article from its html and update counters.
 
-        Once successfully extracted, it is then passed to `article_callback`.
-
         Note:
-            If the extraction process fails, the article will be discarded.
+            If the extraction process fails, None's will be returned in-place
+            of the article and language.
 
         Args:
             url (str): The source URL of the article.
             html (str): The complete HTML structure of the record.
-            language (str): The two-char language code of the record.
+
+        Returns:
+            Article: The extracted article
+            str: The short-code of the detected language.
         """
         article = Article(url)
 
@@ -338,6 +356,9 @@ class ExtractionJob:
 
         Args:
             warc (HTTPResponse): The complete warc file as a stream.
+            file_size (int): The WARC file size in bytes,
+            limit (int): The number of records to iterate through before
+                exiting.
         """
         records = ArchiveIterator(warc, arc2warc=True)
         self.logger.info("Iterating through records.")
@@ -377,6 +398,10 @@ class ExtractionJob:
                 self.__errored += 1
 
     def save_to_parquet(self):
+        """Save the list of extracted articles to a parquet file.
+
+        The path to this parquet is given by `self.filepath`.
+        """
         self.logger.info(f"Saving to '{self.filepath}'")
         table = pa.Table.from_pylist(self.articles)
 

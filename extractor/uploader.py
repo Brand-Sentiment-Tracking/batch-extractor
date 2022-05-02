@@ -21,12 +21,12 @@ class ArticleToParquetS3:
 
     Args:
         bucket (str): The name of the bucket on S3 to push to.
-        parquet_dir (str): The filepath from the S3 bucket root to the
-            Parquet file to push to.
-        batch_size (int): The number of articles to extract before pushing as
-            a batch.
         partitions (Tuple[str]): The set of keys to partition the parquet file
             by. All available keys can be found in `self.FIELDS`.
+        log_level (_Level): The severity level of logs to be reported.
+        parquet_dir (str): The local directory to save parquet files to before
+            uploading.
+        processors (int): The number of processors to use in the job pool.
     """
     FIELDS = ("title", "main_text", "url", "source_domain",
               "date_publish", "date_crawled", "language")
@@ -70,6 +70,12 @@ class ArticleToParquetS3:
 
     @property
     def parquet_dir(self):
+        """`str`: The path to the local directory for storing parquet files.
+
+        When defining the path, the setter will automatically create it if it
+        doesn't exist. The setter will also raise a ValueError if the path
+        exists but is not a directory.
+        """
         return self.__parquet_dir
 
     @parquet_dir.setter
@@ -91,6 +97,7 @@ class ArticleToParquetS3:
 
     @property
     def max_records(self) -> int:
+        """`int`: The maximum records to save to a single parquet file."""
         return self.__max_records
 
     @max_records.setter
@@ -104,11 +111,7 @@ class ArticleToParquetS3:
 
     @property
     def partitions(self) -> Tuple[str]:
-        """`Tuple[str]`: The keys to partition the parquet file by in S3.
-
-        The setter will raise a ValueError if the new keys are not a tuple of
-        strings or one of the keys doesn't exist in the dataframe.
-        """
+        """`Tuple[str]`: The keys to partition the parquet file by in S3."""
         return self.__partitions
 
     @partitions.setter
@@ -127,9 +130,15 @@ class ArticleToParquetS3:
         self.__partitions = keys
 
     def report_counters(self):
+        """Calls the extractor's `report_counters()` method."""
         self.extractor.report_counters()
 
-    def upload_parquet_to_s3(self, parquet_file):
+    def upload_parquet_to_s3(self, parquet_file: str):
+        """Push a local parquet file to the S3 bucket with snappy compression.
+
+        Args:
+            parquet_file (str): The parquet file to upload to S3.
+        """
         basename = os.path.basename(parquet_file)
         df = self.spark.read.parquet(parquet_file)
 
@@ -145,7 +154,18 @@ class ArticleToParquetS3:
 
     def run(self, patterns: List[str], start_date: datetime,
             end_date: datetime, limit: Optional[int] = None):
+        """Run an extraction job and upload to S3 once completed.
 
+        Args:
+            patterns (List[str]): List of URL patterns the article must match.
+            start_date (datetime): The earliest date the article must have
+                been crawled.
+            end_date (datetime): The latest date the article must have been
+                crawled by.
+            limit (int): The number of records each job should iterate over
+                before exiting. If None, then the job will continue to the
+                end of the WARC file.
+        """
         self.extractor.download_articles(patterns, start_date,
                                          end_date, limit)
 

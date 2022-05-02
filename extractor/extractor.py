@@ -21,8 +21,7 @@ class ArticleExtractor:
     """Load and parse articles from CommonCrawl News Archive.
 
     Args:
-        log_level (logging._Level): The severity level of logs to be
-            reported, e.g., `DEBUG`, `INFO`, `WARN`, etc.
+        log_level (_Level): The severity level of logs to be reported.
         parquet_dir (str): The path to the local directory for storing
             parquet files after extraction. The directory will automatically
             be created if it doesn't already exist.
@@ -59,8 +58,8 @@ class ArticleExtractor:
         """`str`: The path to the local directory for storing parquet files.
 
         When defining the path, the setter will automatically create it if it
-        doesn't exist. The setter will also raise a ValueError if the new path
-        is not a string, or if the path exists but is not a directory.
+        doesn't exist. The setter will also raise a ValueError if the path
+        exists but is not a directory.
         """
         return self.__parquet_dir
 
@@ -82,9 +81,6 @@ class ArticleExtractor:
 
         If set as `None`, the number of CPU processors available will be used
         based off `os.cpu_count()`.
-
-        If the new value is greater than the number of CPUs available, or is
-        not an integer, a ValueError will be raised.
         """
         return self.__processes
 
@@ -107,8 +103,8 @@ class ArticleExtractor:
     def start_date(self) -> datetime:
         """`datetime`: The starting date to filter the articles between.
 
-        The setter method will throw a ValueError if the new date is not a
-        `datetime` object or it is later than the end date.
+        The setter method will throw a ValueError if the new date is
+        later than the end date.
         """
         return self.__start_date
 
@@ -125,8 +121,8 @@ class ArticleExtractor:
     def end_date(self) -> datetime:
         """`datetime`: The ending date to filter the articles between.
 
-        The setter method will throw a ValueError if the new date is not a
-        `datetime` object or it is in the future.
+        The setter method will throw a ValueError if the new date
+        is in the future.
         """
         return self.__end_date
 
@@ -220,6 +216,21 @@ class ArticleExtractor:
         return filenames
 
     def __extract_date(self, warc_filepath: str) -> datetime:
+        """Get the date when a WARC file was published based off its filename.
+
+        Note:
+            If the filepath doesn't match the warc filename regex, the method
+                will return False.
+
+        Args:
+            warc_filepath (str): The path from CC-NEWS domain to the file.
+                The path is not checked, but the filename should have the
+                following structure:
+                    `CC-NEWS-20220401000546-00192.warc.gz`
+
+        Returns:
+            datetime: The date and time when the WARC file was published.
+        """
         match = self.WARC_FILE_RE.search(warc_filepath)
 
         if match is None:
@@ -309,7 +320,7 @@ class ArticleExtractor:
 
         Note:
             This method is designed to run as a concurrent process, so it is
-            treated as a staticmethod, with all variables passed through the
+            treated as a static method, with all variables passed through the
             function call.
 
         Args:
@@ -318,6 +329,9 @@ class ArticleExtractor:
                 based off the source URL.
             date_crawled (datetime): The publish date/time of the WARC file.
             parquet_dir (str): The local directory to save parquet files to.
+            limit (int or None): The number of records to iterate over before
+                exiting. If None, then the job will continue to the end of
+                the WARC file.
             log_level (int): The minimum severity level the ExtractionJob logs
                 should report.
 
@@ -393,6 +407,9 @@ class ArticleExtractor:
                 been crawled.
             end_date (datetime): The latest date the article must have been
                 crawled by.
+            limit (int or None): The number of records each job should iterate
+                over before exiting. If None, then the job will continue to
+                the end of the WARC file.
         """
         self.logger.info(f"Downloading articles crawled between "
                          f"{start_date.date()} and {end_date.date()}.")

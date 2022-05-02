@@ -17,9 +17,12 @@ end_date = environ.get("END_DATE")
 
 max_records = int(max_records)
 
+# Set URL patterns to any if not specified
 url_patterns = json.loads(url_patterns) \
     if url_patterns is not None else ["*"]
 
+# Set extraction date to yesterday if not specified
+# Else parse the dates using ISO format.
 if start_date is not None and end_date is not None:
     start_date = datetime.fromisoformat(start_date)
     end_date = datetime.fromisoformat(end_date)
