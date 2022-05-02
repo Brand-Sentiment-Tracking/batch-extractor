@@ -91,7 +91,7 @@ class TestArticleToParquetS3(unittest.TestCase):
         e1 = str(a1.exception)
         e2 = str(a2.exception)
 
-        self.assertEqual(e1, "Partition keys is not a tuple or is empty.")
+        self.assertEqual(e1, "Partition keys is not a tuple.")
         self.assertEqual(e2, "Not all keys are strings.")
 
     def test_invalid_partitions_missing_or_duplicate_keys(self):

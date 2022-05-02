@@ -67,7 +67,7 @@ class TestArticleExtractor(unittest.TestCase):
         e2 = str(a2.exception)
         e3 = str(a3.exception)
 
-        self.assertEqual(e1, "Processors is not an integer greater than 0.")
+        self.assertEqual(e1, "Processors is not an integer.")
 
         self.assertEqual(e2, "-1 processors is less than 1 or greater"
                          " than the number of CPUs available.")
