@@ -17,7 +17,3 @@ ENV PARQUET_FILEPATH=v1-dev.parquet
 ENV URL_PATTERNS='["*business*"]'
 ENV BATCH_UPLOAD_SIZE=100
 ```
-
-## Repository Structure
-
-## Contact
